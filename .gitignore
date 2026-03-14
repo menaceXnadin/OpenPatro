@@ -1,0 +1,26 @@
+# Build outputs
+bin/
+obj/
+
+# IDE/editor
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs and diagnostics
+*.log
+xamlcompiler-stdout.log
+xamlcompiler-stderr.log
+build-diag.log
+build-test.log
+
+# Python cache/helpers
+__pycache__/
+*.pyc
+
+# Local data/runtime artifacts
+calendar.db
+failed.txt
+log-tail.txt
