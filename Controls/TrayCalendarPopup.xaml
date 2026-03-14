@@ -6,15 +6,60 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Border Width="340"
-            Padding="16"
-            CornerRadius="16"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            BorderThickness="1">
-        <StackPanel Spacing="12">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="TrayPopupSurfaceBrush" Color="#111214" />
+        <SolidColorBrush x:Key="TrayPopupPanelBrush" Color="#181A1E" />
+        <SolidColorBrush x:Key="TrayPopupBorderBrush" Color="#2A2D33" />
+        <SolidColorBrush x:Key="TrayPopupTextBrush" Color="#F4F4F4" />
+        <SolidColorBrush x:Key="TrayPopupMutedBrush" Color="#AAADB3" />
+        <SolidColorBrush x:Key="TrayPopupSubtleBrush" Color="#20242A" />
+        <SolidColorBrush x:Key="TrayPopupHolidayBrush" Color="#FF6060" />
 
-            <!-- Month header and navigation -->
+        <Style x:Key="TrayPopupIconButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="40" />
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource TrayPopupTextBrush}" />
+            <Setter Property="Background" Value="#242830" />
+            <Setter Property="BorderBrush" Value="#00000000" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+    </UserControl.Resources>
+
+        <Border Padding="20,18,20,20"
+            CornerRadius="0"
+            Background="{StaticResource TrayPopupSurfaceBrush}"
+            BorderBrush="{StaticResource TrayPopupBorderBrush}"
+            BorderThickness="1">
+        <StackPanel Spacing="18">
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding TodayBsFullDate}"
+                               FontFamily="{StaticResource AppNepaliFontFamily}"
+                               FontSize="24"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TrayPopupTextBrush}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding TodayAdDateText}"
+                               FontSize="14"
+                               Foreground="{StaticResource TrayPopupMutedBrush}" />
+                </StackPanel>
+
+                <Button Grid.Column="1"
+                        Style="{StaticResource TrayPopupIconButtonStyle}"
+                        Command="{Binding OpenMainWindowCommand}"
+                        ToolTipService.ToolTip="Open full app">
+                    <FontIcon Glyph="&#xE8A7;" FontSize="16" />
+                </Button>
+            </Grid>
+
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -24,27 +69,30 @@
                 <StackPanel>
                     <TextBlock Text="{Binding MonthTitleNepali}"
                                FontFamily="{StaticResource AppNepaliFontFamily}"
-                               FontSize="20"
-                               FontWeight="SemiBold" />
+                               FontSize="28"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TrayPopupTextBrush}" />
                     <TextBlock Text="{Binding MonthTitleEnglish}"
-                               Opacity="0.68"
-                               FontSize="12" />
+                               FontSize="14"
+                               Foreground="{StaticResource TrayPopupMutedBrush}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
-                            Spacing="4">
-                    <Button Command="{Binding PreviousMonthCommand}" Width="32" Height="32" Padding="0">
-                        <FontIcon Glyph="&#xE76B;" FontSize="12" />
+                            Spacing="8">
+                    <Button Command="{Binding PreviousMonthCommand}" Style="{StaticResource TrayPopupIconButtonStyle}">
+                        <FontIcon Glyph="&#xE76B;" FontSize="13" />
                     </Button>
-                    <Button Command="{Binding NextMonthCommand}" Width="32" Height="32" Padding="0">
-                        <FontIcon Glyph="&#xE76C;" FontSize="12" />
+                    <Button Command="{Binding NextMonthCommand}" Style="{StaticResource TrayPopupIconButtonStyle}">
+                        <FontIcon Glyph="&#xE76C;" FontSize="13" />
                     </Button>
                 </StackPanel>
             </Grid>
 
-            <!-- Day-of-week header -->
-            <Grid>
+            <Border Height="1" Background="#1FFFFFFF" />
+
+            <Grid Width="336"
+                  HorizontalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
@@ -54,22 +102,25 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="आ" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="11" Opacity="0.56" />
-                <TextBlock Grid.Column="1" Text="सो" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="11" Opacity="0.56" />
-                <TextBlock Grid.Column="2" Text="मं" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="11" Opacity="0.56" />
-                <TextBlock Grid.Column="3" Text="बु" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="11" Opacity="0.56" />
-                <TextBlock Grid.Column="4" Text="बि" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="11" Opacity="0.56" />
-                <TextBlock Grid.Column="5" Text="शु" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="11" Opacity="0.56" />
-                <TextBlock Grid.Column="6" Text="श" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="11" Opacity="0.38" />
+                <TextBlock Grid.Column="0" Text="आ" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
+                <TextBlock Grid.Column="1" Text="सो" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
+                <TextBlock Grid.Column="2" Text="मं" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
+                <TextBlock Grid.Column="3" Text="बु" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
+                <TextBlock Grid.Column="4" Text="बि" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
+                <TextBlock Grid.Column="5" Text="शु" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
+                <TextBlock Grid.Column="6" Text="श" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupHolidayBrush}" />
             </Grid>
 
-            <!-- Calendar day grid -->
-            <GridView ItemsSource="{Binding Days}"
+            <GridView x:Name="CalendarDaysGrid"
+                      Width="336"
+                      HorizontalAlignment="Center"
+                      ItemsSource="{Binding Days}"
                       IsItemClickEnabled="True"
                       ItemClick="DaysGrid_ItemClick"
                       SelectionMode="None"
                       BorderThickness="0"
                       Padding="0"
+                      IsTabStop="False"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                       ScrollViewer.VerticalScrollBarVisibility="Disabled"
                       ScrollViewer.VerticalScrollMode="Disabled">
@@ -80,8 +131,8 @@
                 </GridView.ItemsPanel>
                 <GridView.ItemContainerStyle>
                     <Style TargetType="GridViewItem">
-                        <Setter Property="Width" Value="43" />
-                        <Setter Property="Height" Value="40" />
+                        <Setter Property="Width" Value="48" />
+                        <Setter Property="Height" Value="56" />
                         <Setter Property="Padding" Value="0" />
                         <Setter Property="Margin" Value="0" />
                         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -93,50 +144,65 @@
                         <Border Background="{Binding BackgroundBrush}"
                                 BorderBrush="{Binding BorderBrush}"
                                 BorderThickness="{Binding BorderThickness}"
-                                CornerRadius="6"
+                                CornerRadius="{Binding CornerRadius}"
+                                Margin="1"
                                 Opacity="{Binding CellOpacity}">
-                            <StackPanel HorizontalAlignment="Center"
-                                        VerticalAlignment="Center"
-                                        Spacing="1">
+                            <Grid MinWidth="46" MinHeight="54">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
                                 <TextBlock Text="{Binding Record.BsDayText}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           Margin="0,4,0,0"
                                            FontFamily="{StaticResource AppNepaliFontFamily}"
-                                           FontSize="14"
+                                           FontSize="18"
                                            FontWeight="SemiBold"
                                            Foreground="{Binding DayForegroundBrush}"
                                            TextAlignment="Center" />
-                                <TextBlock Text="{Binding AdDayText}"
-                                           FontSize="9"
+                                <TextBlock Grid.Row="1"
+                                           Text="{Binding AdDayText}"
+                                           HorizontalAlignment="Center"
+                                           Margin="0,0,0,7"
+                                           FontSize="11"
                                            Foreground="{Binding TertiaryForegroundBrush}"
                                            TextAlignment="Center" />
-                            </StackPanel>
+                            </Grid>
                         </Border>
                     </DataTemplate>
                 </GridView.ItemTemplate>
             </GridView>
 
-            <!-- Selected day detail -->
             <Border x:Name="SelectedDayDetail"
-                    Visibility="Collapsed"
-                    Padding="12"
-                    CornerRadius="10"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    Visibility="{Binding SelectedDayVisibility}"
+                    Padding="16"
+                    CornerRadius="18"
+                    Background="{StaticResource TrayPopupPanelBrush}"
+                    BorderBrush="{StaticResource TrayPopupBorderBrush}"
                     BorderThickness="1">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="{Binding SelectedDay.Record.BsFullDate}"
-                               FontFamily="{StaticResource AppNepaliFontFamily}"
-                               FontSize="16"
-                               FontWeight="SemiBold"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding SelectedDay.Record.AdDateText}"
-                               Opacity="0.72"
-                               FontSize="12" />
-                    <TextBlock Text="{Binding SelectedEventText}"
-                               FontFamily="{StaticResource AppNepaliFontFamily}"
-                               FontSize="13"
-                               TextWrapping="Wrap"
-                               Visibility="{Binding SelectedHolidayVisibility}" />
-                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              VerticalScrollMode="Enabled"
+                              HorizontalScrollBarVisibility="Disabled"
+                              HorizontalScrollMode="Disabled">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding SelectedHolidayLabel}"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TrayPopupHolidayBrush}"
+                                   Visibility="{Binding SelectedHolidayVisibility}" />
+                        <TextBlock Text="{Binding SelectedEventText}"
+                                   FontFamily="{StaticResource AppNepaliFontFamily}"
+                                   FontSize="15"
+                                   Foreground="{StaticResource TrayPopupTextBrush}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding SelectedPanchanga}"
+                                   FontFamily="{StaticResource AppNepaliFontFamily}"
+                                   FontSize="12"
+                                   Foreground="{StaticResource TrayPopupMutedBrush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
 
         </StackPanel>

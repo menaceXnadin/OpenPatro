@@ -52,12 +52,21 @@ public sealed class SearchViewModel : BindableBase
 
     public async Task SearchAsync()
     {
+        var trimmedQuery = Query.Trim();
+        Query = trimmedQuery;
+
+        if (trimmedQuery.Length == 0)
+        {
+            Results.Clear();
+            return;
+        }
+
         IsBusy = true;
         try
         {
             Results.Clear();
-            var days = await _services.CalendarRepository.SearchAsync(Query);
-            var notes = await _services.UserRepository.SearchNotesAsync(Query);
+            var days = await _services.CalendarRepository.SearchAsync(trimmedQuery);
+            var notes = await _services.UserRepository.SearchNotesAsync(trimmedQuery);
 
             foreach (var day in days)
             {

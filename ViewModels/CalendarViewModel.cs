@@ -15,6 +15,7 @@ namespace OpenPatro.ViewModels;
 public sealed class CalendarViewModel : BindableBase
 {
     private readonly AppServices _services;
+    private CalendarDayRecord? _todayRecord;
     private CalendarDayCellViewModel? _selectedDay;
     private string _selectedNote = string.Empty;
     private bool _isBusy;
@@ -56,6 +57,10 @@ public sealed class CalendarViewModel : BindableBase
         get => _monthTitleEnglish;
         private set => SetProperty(ref _monthTitleEnglish, value);
     }
+
+    public string TodayBsFullDate => _todayRecord?.BsFullDate ?? string.Empty;
+
+    public string TodayAdDateText => _todayRecord?.AdDateText ?? string.Empty;
 
     public CalendarDayCellViewModel? SelectedDay
     {
@@ -118,6 +123,7 @@ public sealed class CalendarViewModel : BindableBase
     public async Task InitializeAsync()
     {
         var today = await _services.CalendarRepository.GetTodayAsync();
+        SetTodayRecord(today);
         if (today is null)
         {
             var currentYear = 2082;
@@ -177,6 +183,7 @@ public sealed class CalendarViewModel : BindableBase
             var previousMonthDays = await _services.CalendarRepository.GetMonthDaysAsync(previous.year, previous.month);
             var nextMonthDays = await _services.CalendarRepository.GetMonthDaysAsync(next.year, next.month);
             var today = await _services.CalendarRepository.GetTodayAsync();
+            SetTodayRecord(today);
 
             Days.Clear();
 
@@ -185,8 +192,7 @@ public sealed class CalendarViewModel : BindableBase
                 return;
             }
 
-            var firstAdDate = DateOnly.Parse(currentMonthDays[0].AdDateIso, CultureInfo.InvariantCulture);
-            var leadingDays = (int)firstAdDate.DayOfWeek;
+            var leadingDays = GetWeekdayColumnIndex(currentMonthDays[0]);
             foreach (var day in previousMonthDays.Skip(Math.Max(0, previousMonthDays.Count - leadingDays)))
             {
                 Days.Add(CreateCell(day, false, today));
@@ -280,14 +286,62 @@ public sealed class CalendarViewModel : BindableBase
 
     private CalendarDayCellViewModel CreateCell(CalendarDayRecord record, bool isCurrentMonth, CalendarDayRecord? today)
     {
-        var adDate = DateOnly.Parse(record.AdDateIso, CultureInfo.InvariantCulture);
         var isToday = today is not null && today.BsYear == record.BsYear && today.BsMonth == record.BsMonth && today.BsDay == record.BsDay;
         return new CalendarDayCellViewModel
         {
             Record = record,
             IsCurrentMonth = isCurrentMonth,
             IsToday = isToday,
-            IsSaturdayColumn = adDate.DayOfWeek == DayOfWeek.Saturday
+            IsSaturdayColumn = GetWeekdayColumnIndex(record) == 6
         };
+    }
+
+    private static int GetWeekdayColumnIndex(CalendarDayRecord record)
+    {
+        var normalizedWeekday = record.NepaliWeekday.Trim();
+        if (normalizedWeekday.Contains("आइत", StringComparison.Ordinal) || normalizedWeekday.Contains("Sunday", StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        if (normalizedWeekday.Contains("सोम", StringComparison.Ordinal) || normalizedWeekday.Contains("Monday", StringComparison.OrdinalIgnoreCase))
+        {
+            return 1;
+        }
+
+        if (normalizedWeekday.Contains("मंगल", StringComparison.Ordinal) || normalizedWeekday.Contains("मङ्गल", StringComparison.Ordinal) || normalizedWeekday.Contains("Tuesday", StringComparison.OrdinalIgnoreCase))
+        {
+            return 2;
+        }
+
+        if (normalizedWeekday.Contains("बुध", StringComparison.Ordinal) || normalizedWeekday.Contains("Wednesday", StringComparison.OrdinalIgnoreCase))
+        {
+            return 3;
+        }
+
+        if (normalizedWeekday.Contains("बिहि", StringComparison.Ordinal) || normalizedWeekday.Contains("बृह", StringComparison.Ordinal) || normalizedWeekday.Contains("Thursday", StringComparison.OrdinalIgnoreCase))
+        {
+            return 4;
+        }
+
+        if (normalizedWeekday.Contains("शुक्र", StringComparison.Ordinal) || normalizedWeekday.Contains("Friday", StringComparison.OrdinalIgnoreCase))
+        {
+            return 5;
+        }
+
+        if (normalizedWeekday.Contains("शनि", StringComparison.Ordinal) || normalizedWeekday.Contains("Saturday", StringComparison.OrdinalIgnoreCase))
+        {
+            return 6;
+        }
+
+        var adDate = DateOnly.Parse(record.AdDateIso, CultureInfo.InvariantCulture);
+        return (int)adDate.DayOfWeek;
+    }
+
+    private void SetTodayRecord(CalendarDayRecord? today)
+    {
+        _todayRecord = today;
+        RaisePropertyChanged(nameof(TodayBsFullDate));
+        RaisePropertyChanged(nameof(TodayAdDateText));
     }
 }

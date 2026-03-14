@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Globalization;
 using H.NotifyIcon;
@@ -20,6 +21,7 @@ namespace OpenPatro
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "openpatro-diag.log");
 
         private MainWindow? _mainWindow;
+        private TrayPopupWindow? _trayPopupWindow;
         private TaskbarIcon? _trayIcon;
         private MenuFlyoutItem? _todayMenuItem;
         private ToggleMenuFlyoutItem? _startupMenuItem;
@@ -187,6 +189,7 @@ namespace OpenPatro
 
         public async Task OpenMainWindowForDateAsync(int year, int month, int day)
         {
+            HideTrayPopupWindow();
             await ShowMainWindowAsync();
             await MainViewModel.SelectCalendarDateAsync(year, month, day);
         }
@@ -207,7 +210,7 @@ namespace OpenPatro
                 }
 
                 _trayIcon.ToolTipText = today.BsFullDate;
-                _trayIcon.Icon = TrayIconGlyphFactory.CreateIcon(today.BsDayText);
+                _trayIcon.Icon = TrayIconGlyphFactory.CreateIcon(today.BsDayText, today.IsHoliday);
 
                 if (_todayMenuItem is not null)
                 {
@@ -229,6 +232,14 @@ namespace OpenPatro
         {
             _allowWindowClose = true;
             _midnightSubscription?.Dispose();
+
+            if (_trayPopupWindow is not null)
+            {
+                _trayPopupWindow.Closed -= TrayPopupWindow_Closed;
+                _trayPopupWindow.Close();
+                _trayPopupWindow = null;
+            }
+
             _trayIcon?.Dispose();
             _mainWindow?.Close();
             Exit();
@@ -254,25 +265,34 @@ namespace OpenPatro
 
         private void InitializeTrayInfrastructure()
         {
+            const double trayMenuMinWidth = 220;
+
             _todayMenuItem = new MenuFlyoutItem
             {
                 Text = "आज",
-                IsEnabled = false
+                IsEnabled = false,
+                MinWidth = trayMenuMinWidth
             };
 
             _startupMenuItem = new ToggleMenuFlyoutItem
             {
-                Text = "Start with Windows"
+                Text = "Start with Windows",
+                MinWidth = trayMenuMinWidth
             };
             _startupMenuItem.Click += StartupMenuItem_Click;
 
-            var contextMenu = new MenuFlyout
+            var contextMenu = new MenuFlyout();
+            var openItem = new MenuFlyoutItem
             {
-                Placement = Microsoft.UI.Xaml.Controls.Primitives.FlyoutPlacementMode.BottomEdgeAlignedLeft
+                Text = "Open Calendar",
+                MinWidth = trayMenuMinWidth
             };
-            var openItem = new MenuFlyoutItem { Text = "Open Calendar" };
             openItem.Click += OpenCalendarMenuItem_Click;
-            var exitItem = new MenuFlyoutItem { Text = "Exit" };
+            var exitItem = new MenuFlyoutItem
+            {
+                Text = "Exit",
+                MinWidth = trayMenuMinWidth
+            };
             exitItem.Click += ExitMenuItem_Click;
             contextMenu.Items.Add(openItem);
             contextMenu.Items.Add(new MenuFlyoutSeparator());
@@ -281,47 +301,159 @@ namespace OpenPatro
             contextMenu.Items.Add(new MenuFlyoutSeparator());
             contextMenu.Items.Add(exitItem);
 
-            var popupContent = new TrayCalendarPopup();
-            popupContent.Attach(MainViewModel.Calendar);
-
-            var popupRoot = TryGetWindowXamlRoot();
-            UIElement trayPopup = popupContent;
-            if (popupRoot is not null)
+            var openTrayCalendarCommand = new AsyncRelayCommand(ToggleTrayPopupWindowAsync);
+            var openMainWindowCommand = new AsyncRelayCommand(async () =>
             {
-                trayPopup = new Popup
-                {
-                    Child = popupContent,
-                    XamlRoot = popupRoot,
-                    ShouldConstrainToRootBounds = false
-                };
-            }
+                HideTrayPopupWindow();
+                await ShowMainWindowAsync();
+            });
+
+            var faviconPath = Path.Combine(AppContext.BaseDirectory, "favicon.ico");
+            var initialIcon = File.Exists(faviconPath)
+                ? new System.Drawing.Icon(faviconPath)
+                : null;
 
             _trayIcon = new TaskbarIcon
             {
                 ToolTipText = "OpenPatro",
+                Icon = initialIcon,
                 ContextFlyout = contextMenu,
-                TrayPopup = trayPopup,
-                LeftClickCommand = MainViewModel.Calendar.OpenMainWindowCommand,
-                DoubleClickCommand = null,
+                TrayPopup = null,
+                LeftClickCommand = openTrayCalendarCommand,
+                DoubleClickCommand = openMainWindowCommand,
                 NoLeftClickDelay = true
             };
 
             SetEnumProperty(_trayIcon, "MenuActivation", "RightClick");
-            // When XamlRoot is unavailable, disable tray popup activation to avoid runtime COM crash.
-            SetEnumProperty(_trayIcon, "PopupActivation", popupRoot is null ? "None" : "DoubleClick");
+            SetEnumProperty(_trayIcon, "PopupActivation", "None");
             SetEnumProperty(_trayIcon, "ContextMenuMode", "SecondWindow");
             _trayIcon.ForceCreate();
+
+            // Pre-bootstrap the popup window immediately so its HWND is alive from
+            // the start. Without this the WinUI dispatcher shuts down when the main
+            // window is hidden and H.NotifyIcon left-click commands stop firing.
+            GetOrCreateTrayPopupWindow().Bootstrap();
         }
 
-        private XamlRoot? TryGetWindowXamlRoot()
+        private async Task ToggleTrayPopupWindowAsync()
         {
-            if (_mainWindow?.Content is FrameworkElement root)
+            if (_uiDispatcherQueue?.HasThreadAccess == true)
             {
-                return root.XamlRoot;
+                await ToggleTrayPopupWindowCoreAsync();
+                return;
             }
 
-            return null;
+            var dispatcher = _uiDispatcherQueue;
+            if (dispatcher is null)
+            {
+                return;
+            }
+
+            var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            // IMPORTANT: TryEnqueue takes a DispatcherQueueHandler (void delegate).
+            // Using async lambda here creates async void, which means:
+            //   - Exceptions crash the process instead of propagating to the caller
+            //   - The AsyncRelayCommand._isRunning flag gets stuck as true permanently
+            // Use a synchronous lambda that fires-and-forgets the async work safely.
+            if (!dispatcher.TryEnqueue(() =>
+                {
+                    _ = SafeToggleAndComplete(tcs);
+                }))
+            {
+                tcs.TrySetException(new InvalidOperationException("Unable to enqueue tray popup activation."));
+            }
+
+            await tcs.Task;
         }
+
+        private async Task SafeToggleAndComplete(TaskCompletionSource<object?> tcs)
+        {
+            try
+            {
+                await ToggleTrayPopupWindowCoreAsync();
+                tcs.TrySetResult(null);
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+            }
+        }
+
+        private async Task ToggleTrayPopupWindowCoreAsync()
+        {
+            Log("TrayPopup: toggle requested");
+            await MainViewModel.Calendar.EnsureLoadedAsync();
+
+            // If the existing popup window's HWND has been destroyed, recreate it.
+            if (_trayPopupWindow is not null)
+            {
+                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_trayPopupWindow);
+                if (hwnd == IntPtr.Zero || !IsWindow(hwnd))
+                {
+                    Log("TrayPopup: existing HWND is invalid, recreating");
+                    _trayPopupWindow.Closed -= TrayPopupWindow_Closed;
+                    _trayPopupWindow = null;
+                }
+            }
+
+            var popupWindow = GetOrCreateTrayPopupWindow();
+            if (popupWindow.IsPopupVisible)
+            {
+                Log("TrayPopup: hiding");
+                popupWindow.HidePopup();
+                return;
+            }
+
+            try
+            {
+                Log("TrayPopup: showing");
+                popupWindow.ShowPopup();
+                Log("TrayPopup: shown OK");
+            }
+            catch (Exception ex)
+            {
+                Log($"TrayPopup.Show FAILED. Recreating popup window. {ex}");
+
+                if (_trayPopupWindow is not null)
+                {
+                    _trayPopupWindow.Closed -= TrayPopupWindow_Closed;
+                    _trayPopupWindow = null;
+                }
+
+                popupWindow = GetOrCreateTrayPopupWindow();
+                popupWindow.ShowPopup();
+                Log("TrayPopup: shown OK after recreate");
+            }
+        }
+
+        private TrayPopupWindow GetOrCreateTrayPopupWindow()
+        {
+            if (_trayPopupWindow is not null)
+            {
+                return _trayPopupWindow;
+            }
+
+            _trayPopupWindow = new TrayPopupWindow(MainViewModel.Calendar);
+            _trayPopupWindow.Closed += TrayPopupWindow_Closed;
+            return _trayPopupWindow;
+        }
+
+        private void TrayPopupWindow_Closed(object sender, WindowEventArgs args)
+        {
+            if (ReferenceEquals(sender, _trayPopupWindow))
+            {
+                _trayPopupWindow = null;
+            }
+        }
+
+        private void HideTrayPopupWindow()
+        {
+            _trayPopupWindow?.HidePopup();
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindow(IntPtr hWnd);
 
         private static void SetEnumProperty(object target, string propertyName, string enumValue)
         {
@@ -355,6 +487,7 @@ namespace OpenPatro
 
         private async void OpenCalendarMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            HideTrayPopupWindow();
             await ShowMainWindowAsync();
         }
 

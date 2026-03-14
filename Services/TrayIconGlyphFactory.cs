@@ -3,7 +3,6 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.IO;
-using Microsoft.UI.Xaml;
 
 namespace OpenPatro.Services;
 
@@ -21,10 +20,15 @@ public static class TrayIconGlyphFactory
     /// because GeneratedIconSource internally uses System.Drawing.FontFamily which
     /// cannot load fonts from file paths – only installed system fonts.
     /// </summary>
-    public static Icon CreateIcon(string text)
+    public static Icon CreateIcon(string text, bool isHoliday)
     {
         const int size = 64;
-        var accentColor = GetAccentColor();
+        var primaryColor = isHoliday
+            ? Color.FromArgb(255, 255, 98, 98)
+            : Color.FromArgb(255, 248, 250, 252);
+        var shadowColor = isHoliday
+            ? Color.FromArgb(180, 40, 0, 0)
+            : Color.FromArgb(150, 10, 16, 26);
 
         using var bitmap = new Bitmap(size, size);
         using var graphics = Graphics.FromImage(bitmap);
@@ -34,14 +38,24 @@ public static class TrayIconGlyphFactory
         graphics.Clear(Color.Transparent);
 
         var fontFamily = GetFontFamily();
-        using var font = new Font(fontFamily, 36f, FontStyle.Bold, GraphicsUnit.Pixel);
-        using var brush = new SolidBrush(accentColor);
+        using var font = new Font(fontFamily, GetFontSize(text), FontStyle.Bold, GraphicsUnit.Pixel);
+        using var brush = new SolidBrush(primaryColor);
+        using var shadowBrush = new SolidBrush(shadowColor);
+        using var format = new StringFormat
+        {
+            Alignment = StringAlignment.Center,
+            LineAlignment = StringAlignment.Center
+        };
 
-        var textSize = graphics.MeasureString(text, font);
-        var x = (size - textSize.Width) / 2f;
-        var y = (size - textSize.Height) / 2f;
+        var textBounds = new RectangleF(0, -2, size, size - 2);
+        foreach (var offset in GetShadowOffsets())
+        {
+            var shadowBounds = textBounds;
+            shadowBounds.Offset(offset.X, offset.Y);
+            graphics.DrawString(text, font, shadowBrush, shadowBounds, format);
+        }
 
-        graphics.DrawString(text, font, brush, x, y);
+        graphics.DrawString(text, font, brush, textBounds, format);
 
         return Icon.FromHandle(bitmap.GetHicon());
     }
@@ -77,16 +91,28 @@ public static class TrayIconGlyphFactory
         return new FontFamily("Segoe UI");
     }
 
-    private static Color GetAccentColor()
+    private static float GetFontSize(string text)
     {
-        try
+        return text.Length switch
         {
-            var winColor = (Windows.UI.Color)Application.Current.Resources["SystemAccentColor"];
-            return Color.FromArgb(winColor.A, winColor.R, winColor.G, winColor.B);
-        }
-        catch
-        {
-            return Color.White;
-        }
+            <= 1 => 48f,
+            2 => 42f,
+            _ => 36f
+        };
+    }
+
+    private static PointF[] GetShadowOffsets()
+    {
+        return
+        [
+            new PointF(-1.4f, 0f),
+            new PointF(1.4f, 0f),
+            new PointF(0f, -1.4f),
+            new PointF(0f, 1.4f),
+            new PointF(-1f, -1f),
+            new PointF(1f, -1f),
+            new PointF(-1f, 1f),
+            new PointF(1f, 1f)
+        ];
     }
 }

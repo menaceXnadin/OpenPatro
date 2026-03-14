@@ -84,11 +84,11 @@
                 <Grid x:Name="TitleBarDragRegion"
                       Height="48"
                       Margin="0,0,0,16">
-                    <TextBlock Text="ओ"
-                               FontFamily="{StaticResource AppNepaliFontFamily}"
-                               FontSize="22"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Center" />
+                    <Image Source="ms-appx:///Assets/Square44x44Logo.scale-200.png"
+                           Width="32"
+                           Height="32"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center" />
                 </Grid>
 
                 <ToggleButton x:Name="CalendarButton"
@@ -204,7 +204,8 @@
                                             BorderBrush="{Binding BorderBrush}"
                                             BorderThickness="{Binding BorderThickness}"
                                             CornerRadius="8"
-                                            Padding="10"
+                                            Margin="6"
+                                            Padding="12"
                                             Opacity="{Binding CellOpacity}">
                                         <Grid>
                                             <Grid.RowDefinitions>
@@ -324,7 +325,10 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBox Text="{x:Bind ViewModel.Search.Query, Mode=TwoWay}" PlaceholderText="Event, tithi, note" />
+                        <TextBox x:Name="SearchQueryBox"
+                                 Text="{x:Bind ViewModel.Search.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="Event, tithi, date, note"
+                                 KeyDown="SearchQueryBox_KeyDown" />
                         <Button Grid.Column="1" Command="{x:Bind ViewModel.Search.SearchCommand, Mode=OneWay}">Search</Button>
                     </Grid>
                     <ListView ItemsSource="{x:Bind ViewModel.Search.Results, Mode=OneWay}"

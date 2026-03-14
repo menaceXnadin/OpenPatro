@@ -1,14 +1,61 @@
 using System;
+using System.IO;
+using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using OpenPatro.ViewModels;
+using Windows.System;
 
 namespace OpenPatro
 {
     public sealed partial class MainWindow : Window
     {
+        private const int GwlpWndProc = -4;
+        private const uint WmGetMinMaxInfo = 0x0024;
+        private const double MinWindowWidthDip = 920;
+        private const double MinWindowHeightDip = 640;
+        private const int DwmaUseImmersiveDarkModeBefore20H1 = 19;
+        private const int DwmaUseImmersiveDarkMode = 20;
+
+        private IntPtr _previousWndProc = IntPtr.Zero;
+        private WndProcDelegate? _wndProcDelegate;
+
+        private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Point
+        {
+            public int X;
+            public int Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MinMaxInfo
+        {
+            public Point ptReserved;
+            public Point ptMaxSize;
+            public Point ptMaxPosition;
+            public Point ptMinTrackSize;
+            public Point ptMaxTrackSize;
+        }
+
+        [DllImport("dwmapi.dll")]
+        private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int valueSize);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+        private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr DefWindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+        [DllImport("user32.dll")]
+        private static extern uint GetDpiForWindow(IntPtr hWnd);
+
         public MainWindow()
         {
             ViewModel = ((App)Application.Current).MainViewModel;
@@ -17,6 +64,11 @@ namespace OpenPatro
 
             ExtendsContentIntoTitleBar = false;
             SizeChanged += MainWindow_SizeChanged;
+            Closed += MainWindow_Closed;
+
+            ApplyWindowIcon();
+            ApplyDarkTitleBar();
+            ConfigureMinimumWindowSize();
 
             UpdateSectionVisibility();
         }
@@ -48,6 +100,19 @@ namespace OpenPatro
             UpdateCalendarLayout();
         }
 
+        private void MainWindow_Closed(object sender, WindowEventArgs args)
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            if (hwnd == IntPtr.Zero || _previousWndProc == IntPtr.Zero)
+            {
+                return;
+            }
+
+            SetWindowLongPtr(hwnd, GwlpWndProc, _previousWndProc);
+            _previousWndProc = IntPtr.Zero;
+            _wndProcDelegate = null;
+        }
+
         private void CalendarButton_Checked(object sender, RoutedEventArgs e)
         {
             ViewModel.SelectedSection = ShellSection.Calendar;
@@ -58,6 +123,7 @@ namespace OpenPatro
         {
             ViewModel.SelectedSection = ShellSection.Search;
             UpdateSectionVisibility();
+            SearchQueryBox?.Focus(FocusState.Programmatic);
         }
 
         private void SettingsButton_Checked(object sender, RoutedEventArgs e)
@@ -81,6 +147,21 @@ namespace OpenPatro
         {
             ViewModel.Search.OpenResultCommand.Execute(e.ClickedItem);
         }
+
+        private void SearchQueryBox_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if (e.Key != VirtualKey.Enter)
+            {
+                return;
+            }
+
+            if (ViewModel.Search.SearchCommand.CanExecute(null))
+            {
+                ViewModel.Search.SearchCommand.Execute(null);
+                e.Handled = true;
+            }
+        }
+
         private void UpdateSectionVisibility()
         {
             if (CalendarSection is null || SearchSection is null || SettingsSection is null)
@@ -148,7 +229,7 @@ namespace OpenPatro
             calendarDaysView.Width = gridWidth;
 
             panel.ItemWidth = itemWidth;
-            panel.ItemHeight = Math.Floor(itemWidth * 0.92);
+            panel.ItemHeight = Math.Floor(itemWidth * 0.98);
         }
 
         private void Calendar_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -225,6 +306,98 @@ namespace OpenPatro
             animation.Children.Add(fade);
             animation.Completed += (_, _) => DetailPanel.Visibility = Visibility.Collapsed;
             animation.Begin();
+        }
+
+        private void ApplyWindowIcon()
+        {
+            var iconCandidates = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "favicon.ico"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "favicon.ico"),
+                Path.Combine(Environment.CurrentDirectory, "favicon.ico")
+            };
+
+            foreach (var iconPath in iconCandidates)
+            {
+                if (!File.Exists(iconPath))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    AppWindow.SetIcon(iconPath);
+                    return;
+                }
+                catch
+                {
+                    // Try the next candidate path.
+                }
+            }
+        }
+
+        private void ApplyDarkTitleBar()
+        {
+            try
+            {
+                AppWindow.TitleBar.PreferredTheme = Microsoft.UI.Windowing.TitleBarTheme.Dark;
+            }
+            catch
+            {
+                // Fall back to the DWM attribute for older title bar implementations.
+            }
+
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            if (hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            var useDarkMode = 1;
+            _ = DwmSetWindowAttribute(hwnd, DwmaUseImmersiveDarkMode, ref useDarkMode, sizeof(int));
+            _ = DwmSetWindowAttribute(hwnd, DwmaUseImmersiveDarkModeBefore20H1, ref useDarkMode, sizeof(int));
+        }
+
+        private void ConfigureMinimumWindowSize()
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            if (hwnd == IntPtr.Zero)
+            {
+                return;
+            }
+
+            _wndProcDelegate = WindowProc;
+            var newWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate);
+            _previousWndProc = SetWindowLongPtr(hwnd, GwlpWndProc, newWndProc);
+        }
+
+        private IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
+        {
+            if (msg == WmGetMinMaxInfo)
+            {
+                var dpi = GetDpiForWindow(hWnd);
+                if (dpi == 0)
+                {
+                    dpi = 96;
+                }
+
+                var minWidthPx = (int)Math.Ceiling(MinWindowWidthDip * dpi / 96.0);
+                var minHeightPx = (int)Math.Ceiling(MinWindowHeightDip * dpi / 96.0);
+
+                var minMaxInfo = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+                minMaxInfo.ptMinTrackSize.X = Math.Max(minMaxInfo.ptMinTrackSize.X, minWidthPx);
+                minMaxInfo.ptMinTrackSize.Y = Math.Max(minMaxInfo.ptMinTrackSize.Y, minHeightPx);
+                Marshal.StructureToPtr(minMaxInfo, lParam, false);
+
+                return IntPtr.Zero;
+            }
+
+            if (_previousWndProc != IntPtr.Zero)
+            {
+                return CallWindowProc(_previousWndProc, hWnd, msg, wParam, lParam);
+            }
+
+            return DefWindowProc(hWnd, msg, wParam, lParam);
         }
     }
 }

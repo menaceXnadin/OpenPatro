@@ -14,15 +14,6 @@ public sealed partial class TrayCalendarPopup : UserControl
     public void Attach(CalendarViewModel viewModel)
     {
         DataContext = viewModel;
-        viewModel.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(CalendarViewModel.SelectedDay))
-            {
-                SelectedDayDetail.Visibility = viewModel.SelectedDay is null
-                    ? Visibility.Collapsed
-                    : Visibility.Visible;
-            }
-        };
     }
 
     private void DaysGrid_ItemClick(object sender, ItemClickEventArgs e)

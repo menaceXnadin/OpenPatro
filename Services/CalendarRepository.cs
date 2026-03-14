@@ -201,6 +201,12 @@ public sealed class CalendarRepository
 
     public async Task<IReadOnlyList<CalendarDayRecord>> SearchAsync(string query)
     {
+        var trimmedQuery = query.Trim();
+        if (trimmedQuery.Length == 0)
+        {
+            return [];
+        }
+
         var results = new List<CalendarDayRecord>();
         await using var connection = new SqliteConnection($"Data Source={_paths.CalendarDatabasePath}");
         await connection.OpenAsync();
@@ -210,11 +216,17 @@ public sealed class CalendarRepository
             SELECT BsYear, BsMonth, BsDay, BsDayText, BsMonthName, BsFullDate, NepaliWeekday,
                    AdDateIso, AdDateText, EventSummary, Tithi, LunarText, Panchanga, DetailsPath, IsHoliday
             FROM CalendarDays
-            WHERE EventSummary LIKE $query OR Panchanga LIKE $query OR Tithi LIKE $query
+             WHERE EventSummary LIKE $query
+             OR Panchanga LIKE $query
+             OR Tithi LIKE $query
+             OR BsFullDate LIKE $query
+             OR AdDateText LIKE $query
+             OR NepaliWeekday LIKE $query
+             OR BsMonthName LIKE $query
             ORDER BY AdDateIso DESC
             LIMIT 100;
             """;
-        command.Parameters.AddWithValue("$query", $"%{query}%");
+         command.Parameters.AddWithValue("$query", $"%{trimmedQuery}%");
 
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
