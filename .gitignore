@@ -24,3 +24,6 @@ __pycache__/
 calendar.db
 failed.txt
 log-tail.txt
+
+# Local sample input files
+*_sample*.txt
