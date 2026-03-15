@@ -7,6 +7,7 @@ public sealed class StartupService
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string ValueName = "OpenPatro";
+    private const string StartupArgument = "--startup";
 
     public bool IsEnabled()
     {
@@ -19,7 +20,7 @@ public sealed class StartupService
         using var key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true) ?? Registry.CurrentUser.CreateSubKey(RunKeyPath);
         if (enabled)
         {
-            key.SetValue(ValueName, $"\"{Environment.ProcessPath}\"");
+            key.SetValue(ValueName, $"\"{Environment.ProcessPath}\" {StartupArgument}");
             return;
         }
 

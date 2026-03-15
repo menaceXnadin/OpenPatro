@@ -62,12 +62,33 @@ namespace OpenPatro
                 Services = await AppServices.CreateAsync();
                 Log($"AppServices OK. CalendarDB={Services.Paths.CalendarDatabasePath}");
 
+                try
+                {
+                    if (!Services.Startup.IsEnabled())
+                    {
+                        Services.Startup.SetEnabled(true);
+                        Log("Startup: enabled automatically");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"Startup auto-enable FAILED: {ex}");
+                }
+
                 MainViewModel = new MainViewModel(Services);
                 Log("MainViewModel created");
 
                 if (await TryRunBundledSeedModeAsync())
                 {
                     Exit();
+                    return;
+                }
+
+                var isStartupLaunch = IsStartupLaunch();
+                if (isStartupLaunch)
+                {
+                    Log("Startup launch detected: initializing tray only");
+                    _ = InitializeAfterWindowShownAsync();
                     return;
                 }
 
@@ -321,6 +342,19 @@ namespace OpenPatro
             return false;
         }
 
+        private static bool IsStartupLaunch()
+        {
+            foreach (var arg in Environment.GetCommandLineArgs())
+            {
+                if (string.Equals(arg, "--startup", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void InitializeTrayInfrastructure()
         {
             const double trayMenuMinWidth = 220;
@@ -361,12 +395,6 @@ namespace OpenPatro
 
             var showTodayCommand = new RelayCommand(() => _ = ShowTodayFromTrayAsync());
 
-            var openMainWindowCommand = new RelayCommand(() =>
-            {
-                HideTrayPopupWindow();
-                _ = ShowMainWindowAsync();
-            });
-
             var faviconPath = Path.Combine(AppContext.BaseDirectory, "favicon.ico");
             var initialIcon = File.Exists(faviconPath)
                 ? new System.Drawing.Icon(faviconPath)
@@ -379,13 +407,14 @@ namespace OpenPatro
                 ContextFlyout = contextMenu,
                 TrayPopup = null,
                 LeftClickCommand = showTodayCommand,
-                DoubleClickCommand = openMainWindowCommand,
+                // Double-click behavior is intentionally disabled; users can open
+                // the main window from the right-click menu.
                 NoLeftClickDelay = true
             };
 
             SetEnumProperty(_trayIcon, "MenuActivation", "RightClick");
             SetEnumProperty(_trayIcon, "PopupActivation", "None");
-            SetEnumProperty(_trayIcon, "ContextMenuMode", "PopupMenu");
+            SetEnumProperty(_trayIcon, "ContextMenuMode", "SecondWindow");
             _trayIcon.ForceCreate(false);
         }
 
