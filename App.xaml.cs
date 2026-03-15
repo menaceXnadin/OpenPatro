@@ -28,10 +28,16 @@ namespace OpenPatro
         private bool _allowWindowClose;
         private IDisposable? _midnightSubscription;
         private Microsoft.UI.Dispatching.DispatcherQueue? _uiDispatcherQueue;
+        private CalendarViewModel? _trayCalendarViewModel;
+        private DispatcherKeepaliveWindow? _keepaliveWindow;
+        private volatile bool _trayToggleRunning;
+        private DateTimeOffset _trayToggleStartedAt;
+        private DateTimeOffset _lastTrayDateNotificationAt;
+
+        private static readonly TimeSpan TrayDateNotificationCooldown = TimeSpan.FromSeconds(2);
 
         public AppServices Services { get; private set; } = null!;
         public MainViewModel MainViewModel { get; private set; } = null!;
-        public CalendarViewModel SharedCalendarViewModel => MainViewModel.Calendar;
 
         public App()
         {
@@ -140,6 +146,29 @@ namespace OpenPatro
                 _mainWindow.Closed += MainWindow_Closed;
             }
 
+            // The main window may be minimized with WS_EX_TOOLWINDOW to keep the
+            // WinUI dispatcher alive. Restore it to a normal window state.
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_mainWindow);
+            if (hwnd != IntPtr.Zero)
+            {
+                // Remove WS_EX_TOOLWINDOW so the window appears in taskbar again.
+                var exStyle = GetWindowLongPtrApp(hwnd, GwlExStyleApp).ToInt64();
+                if ((exStyle & WsExToolWindowApp) != 0)
+                {
+                    SetWindowLongPtrApp(hwnd, GwlExStyleApp, new IntPtr(exStyle & ~WsExToolWindowApp));
+                    SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SwpNoSize | SwpNoMove | SwpNoZOrder | SwpFrameChanged | SwpShowWindow);
+                }
+
+                // Ensure the window is restored and foregrounded when activated from tray.
+                if (IsIconic(hwnd))
+                {
+                    ShowWindow(hwnd, SwRestore);
+                }
+
+                ShowWindow(hwnd, SwShow);
+                SetForegroundWindow(hwnd);
+            }
+
             _mainWindow.Show();
             _mainWindow.BringToFront();
         }
@@ -155,6 +184,33 @@ namespace OpenPatro
             catch (Exception ex)
             {
                 Log($"InitializeCalendar FAILED: {ex}");
+            }
+
+            // Create a separate CalendarViewModel for the tray popup so it has
+            // independent state (month navigation, day selection) from the main window.
+            try
+            {
+                _trayCalendarViewModel = new CalendarViewModel(Services);
+                await _trayCalendarViewModel.InitializeAsync();
+                Log("Tray CalendarViewModel initialized");
+            }
+            catch (Exception ex)
+            {
+                Log($"Tray CalendarViewModel FAILED: {ex}");
+            }
+
+            // Create a keepalive window that stays alive at all times to prevent the
+            // WinUI dispatcher from shutting down when all user-visible windows are
+            // hidden. This is the reliable replacement for the off-screen parking trick.
+            try
+            {
+                _keepaliveWindow = new DispatcherKeepaliveWindow();
+                _keepaliveWindow.Create();
+                Log("Keepalive window created");
+            }
+            catch (Exception ex)
+            {
+                Log($"Keepalive window FAILED: {ex}");
             }
 
             // Then set up the tray icon (this can be slow with H.NotifyIcon).
@@ -174,6 +230,7 @@ namespace OpenPatro
                 _midnightSubscription = Services.Clock.ScheduleDailyMidnightCallback(() =>
                 {
                     _ = MainViewModel.Calendar.InitializeAsync();
+                    _ = _trayCalendarViewModel?.InitializeAsync();
                     _ = Services.CalendarSync.RunSilentRefreshAsync();
                     _ = RefreshTrayPresentationAsync();
                 });
@@ -241,6 +298,7 @@ namespace OpenPatro
             }
 
             _trayIcon?.Dispose();
+            _keepaliveWindow?.Close();
             _mainWindow?.Close();
             Exit();
             Environment.Exit(0);
@@ -301,11 +359,12 @@ namespace OpenPatro
             contextMenu.Items.Add(new MenuFlyoutSeparator());
             contextMenu.Items.Add(exitItem);
 
-            var openTrayCalendarCommand = new AsyncRelayCommand(ToggleTrayPopupWindowAsync);
-            var openMainWindowCommand = new AsyncRelayCommand(async () =>
+            var showTodayCommand = new RelayCommand(() => _ = ShowTodayFromTrayAsync());
+
+            var openMainWindowCommand = new RelayCommand(() =>
             {
                 HideTrayPopupWindow();
-                await ShowMainWindowAsync();
+                _ = ShowMainWindowAsync();
             });
 
             var faviconPath = Path.Combine(AppContext.BaseDirectory, "favicon.ico");
@@ -319,70 +378,177 @@ namespace OpenPatro
                 Icon = initialIcon,
                 ContextFlyout = contextMenu,
                 TrayPopup = null,
-                LeftClickCommand = openTrayCalendarCommand,
+                LeftClickCommand = showTodayCommand,
                 DoubleClickCommand = openMainWindowCommand,
                 NoLeftClickDelay = true
             };
 
             SetEnumProperty(_trayIcon, "MenuActivation", "RightClick");
             SetEnumProperty(_trayIcon, "PopupActivation", "None");
-            SetEnumProperty(_trayIcon, "ContextMenuMode", "SecondWindow");
-            _trayIcon.ForceCreate();
-
-            // Pre-bootstrap the popup window immediately so its HWND is alive from
-            // the start. Without this the WinUI dispatcher shuts down when the main
-            // window is hidden and H.NotifyIcon left-click commands stop firing.
-            GetOrCreateTrayPopupWindow().Bootstrap();
+            SetEnumProperty(_trayIcon, "ContextMenuMode", "PopupMenu");
+            _trayIcon.ForceCreate(false);
         }
 
-        private async Task ToggleTrayPopupWindowAsync()
+        private async Task ShowTodayFromTrayAsync()
         {
-            if (_uiDispatcherQueue?.HasThreadAccess == true)
-            {
-                await ToggleTrayPopupWindowCoreAsync();
-                return;
-            }
-
             var dispatcher = _uiDispatcherQueue;
-            if (dispatcher is null)
+            if (dispatcher is not null && !dispatcher.HasThreadAccess)
             {
+                var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+                if (!dispatcher.TryEnqueue(async () =>
+                    {
+                        try
+                        {
+                            await ShowTodayFromTrayAsync();
+                            tcs.TrySetResult(null);
+                        }
+                        catch (Exception ex)
+                        {
+                            tcs.TrySetException(ex);
+                        }
+                    }))
+                {
+                    Log("TrayDate: failed to enqueue notification on UI dispatcher");
+                    return;
+                }
+
+                await tcs.Task;
                 return;
             }
 
-            var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-            // IMPORTANT: TryEnqueue takes a DispatcherQueueHandler (void delegate).
-            // Using async lambda here creates async void, which means:
-            //   - Exceptions crash the process instead of propagating to the caller
-            //   - The AsyncRelayCommand._isRunning flag gets stuck as true permanently
-            // Use a synchronous lambda that fires-and-forgets the async work safely.
-            if (!dispatcher.TryEnqueue(() =>
-                {
-                    _ = SafeToggleAndComplete(tcs);
-                }))
-            {
-                tcs.TrySetException(new InvalidOperationException("Unable to enqueue tray popup activation."));
-            }
-
-            await tcs.Task;
-        }
-
-        private async Task SafeToggleAndComplete(TaskCompletionSource<object?> tcs)
-        {
             try
             {
-                await ToggleTrayPopupWindowCoreAsync();
-                tcs.TrySetResult(null);
+                var now = DateTimeOffset.UtcNow;
+                if (now - _lastTrayDateNotificationAt < TrayDateNotificationCooldown)
+                {
+                    return;
+                }
+
+                HideTrayPopupWindow();
+
+                var today = await Services.CalendarRepository.GetTodayAsync();
+                var nepaliDate = today?.BsFullDate;
+                var englishDate = today?.AdDateText;
+                var message =
+                    $"Nepali (BS): {nepaliDate ?? "Unavailable"}\r\n" +
+                    $"English (AD): {englishDate ?? "Unavailable"}";
+
+                TryShowTrayNotification("OpenPatro - Today", message);
+                _lastTrayDateNotificationAt = now;
             }
             catch (Exception ex)
             {
-                tcs.TrySetException(ex);
+                Log($"TrayDate FAILED: {ex}");
+            }
+        }
+
+        private void TryShowTrayNotification(string title, string message)
+        {
+            if (_trayIcon is null)
+            {
+                return;
+            }
+
+            try
+            {
+                var method = _trayIcon.GetType().GetMethod("ShowNotification", BindingFlags.Instance | BindingFlags.Public);
+                if (method is null)
+                {
+                    return;
+                }
+
+                var parameters = method.GetParameters();
+                if (parameters.Length < 2)
+                {
+                    return;
+                }
+
+                var args = new object?[parameters.Length];
+                args[0] = title;
+                args[1] = message;
+
+                for (var index = 2; index < parameters.Length; index++)
+                {
+                    args[index] = parameters[index].HasDefaultValue ? parameters[index].DefaultValue : null;
+                }
+
+                _ = method.Invoke(_trayIcon, args);
+            }
+            catch (Exception ex)
+            {
+                Log($"TrayDate notification FAILED: {ex}");
+            }
+        }
+
+        /// <summary>
+        /// Fire-and-forget wrapper for ToggleTrayPopupWindowCoreAsync with its own
+        /// re-entrancy guard that auto-resets after a timeout so it can never get
+        /// permanently stuck.
+        /// </summary>
+        private async Task SafeToggleTrayPopupAsync()
+        {
+            var dispatcher = _uiDispatcherQueue;
+            if (dispatcher is not null && !dispatcher.HasThreadAccess)
+            {
+                var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+                if (!dispatcher.TryEnqueue(async () =>
+                    {
+                        try
+                        {
+                            await SafeToggleTrayPopupAsync();
+                            tcs.TrySetResult(null);
+                        }
+                        catch (Exception ex)
+                        {
+                            tcs.TrySetException(ex);
+                        }
+                    }))
+                {
+                    Log("TrayPopup: failed to enqueue toggle on UI dispatcher");
+                    return;
+                }
+
+                await tcs.Task;
+                return;
+            }
+
+            // Re-entrancy guard with a 5-second timeout failsafe.
+            // If a previous toggle somehow never completed (e.g. dispatcher stalled),
+            // the timeout ensures we don't stay stuck forever.
+            if (_trayToggleRunning)
+            {
+                if (DateTimeOffset.UtcNow - _trayToggleStartedAt < TimeSpan.FromSeconds(5))
+                {
+                    Log("TrayPopup: toggle already running, ignoring click");
+                    return;
+                }
+
+                Log("TrayPopup: previous toggle timed out, forcing reset");
+            }
+
+            _trayToggleRunning = true;
+            _trayToggleStartedAt = DateTimeOffset.UtcNow;
+            try
+            {
+                await ToggleTrayPopupWindowCoreAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"SafeToggleTrayPopup FAILED: {ex}");
+            }
+            finally
+            {
+                _trayToggleRunning = false;
             }
         }
 
         private async Task ToggleTrayPopupWindowCoreAsync()
         {
             Log("TrayPopup: toggle requested");
-            await MainViewModel.Calendar.EnsureLoadedAsync();
+            if (_trayCalendarViewModel is not null)
+            {
+                await _trayCalendarViewModel.EnsureLoadedAsync();
+            }
 
             // If the existing popup window's HWND has been destroyed, recreate it.
             if (_trayPopupWindow is not null)
@@ -433,7 +599,10 @@ namespace OpenPatro
                 return _trayPopupWindow;
             }
 
-            _trayPopupWindow = new TrayPopupWindow(MainViewModel.Calendar);
+            // Use the dedicated tray ViewModel so the popup has independent state.
+            // Fall back to the main Calendar ViewModel if the tray one isn't ready yet.
+            var trayVm = _trayCalendarViewModel ?? MainViewModel.Calendar;
+            _trayPopupWindow = new TrayPopupWindow(trayVm);
             _trayPopupWindow.Closed += TrayPopupWindow_Closed;
             return _trayPopupWindow;
         }
@@ -454,6 +623,40 @@ namespace OpenPatro
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool IsWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+        private static extern IntPtr GetWindowLongPtrApp(IntPtr hWnd, int nIndex);
+
+        [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+        private static extern IntPtr SetWindowLongPtrApp(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+        private const uint SwpNoSize = 0x0001;
+        private const uint SwpNoActivate = 0x0010;
+        private const uint SwpNoZOrder = 0x0004;
+        private const uint SwpNoMove = 0x0002;
+        private const uint SwpFrameChanged = 0x0020;
+        private const uint SwpShowWindow = 0x0040;
+        private const int SwRestore = 9;
+        private const int SwMinimize = 6;
+        private const int SwShow = 5;
+        private const int GwlExStyleApp = -20;
+        private const int WsExToolWindowApp = 0x00000080;
 
         private static void SetEnumProperty(object target, string propertyName, string enumValue)
         {
@@ -482,7 +685,30 @@ namespace OpenPatro
             }
 
             args.Handled = true;
-            _mainWindow?.Hide();
+
+            // IMPORTANT: Do NOT call _mainWindow.Hide() here.
+            // Window.Hide() tells the WinUI runtime this window is gone. Once all
+            // WinUI-tracked windows are hidden, the runtime shuts down the dispatcher
+            // message loop, which kills H.NotifyIcon's ability to deliver click events.
+            //
+            // Instead, MINIMIZE the window and add WS_EX_TOOLWINDOW so it disappears
+            // from the taskbar and Alt+Tab. A minimized window is still considered
+            // "visible" by Windows, which keeps the WinUI dispatcher alive.
+            if (_mainWindow is not null)
+            {
+                var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_mainWindow);
+                if (hwnd != IntPtr.Zero)
+                {
+                    // Add WS_EX_TOOLWINDOW to hide from taskbar / Alt+Tab.
+                    var exStyle = GetWindowLongPtrApp(hwnd, GwlExStyleApp).ToInt64();
+                    SetWindowLongPtrApp(hwnd, GwlExStyleApp, new IntPtr(exStyle | WsExToolWindowApp));
+                    SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SwpNoSize | SwpNoMove | SwpNoActivate | SwpNoZOrder | SwpFrameChanged);
+
+                    // Minimize — keeps the window "visible" in Win32/WinUI terms.
+                    ShowWindow(hwnd, SwMinimize);
+                    Log("MainWindow: minimized + hidden from taskbar");
+                }
+            }
         }
 
         private async void OpenCalendarMenuItem_Click(object sender, RoutedEventArgs e)
