@@ -33,6 +33,7 @@ namespace OpenPatro
         private volatile bool _trayToggleRunning;
         private DateTimeOffset _trayToggleStartedAt;
         private DateTimeOffset _lastTrayDateNotificationAt;
+        private bool _calendarResetInProgress;
 
         private static readonly TimeSpan TrayDateNotificationCooldown = TimeSpan.FromSeconds(2);
 
@@ -94,7 +95,7 @@ namespace OpenPatro
                 }
 
                 Log("Showing MainWindow...");
-                ShowMainWindow();
+                ShowMainWindow(resetCalendarToToday: false);
                 Log("MainWindow shown");
 
                 // Load data and tray icon in the background so the window appears instantly.
@@ -106,22 +107,37 @@ namespace OpenPatro
             }
         }
 
-        public void ShowMainWindow()
+        public void ShowMainWindow(bool resetCalendarToToday = true)
         {
             if (_uiDispatcherQueue?.HasThreadAccess == true)
             {
                 ShowMainWindowCore();
+                if (resetCalendarToToday)
+                {
+                    _ = ResetCalendarToTodayAsync();
+                }
                 return;
             }
 
-            _uiDispatcherQueue?.TryEnqueue(ShowMainWindowCore);
+            _uiDispatcherQueue?.TryEnqueue(() =>
+            {
+                ShowMainWindowCore();
+                if (resetCalendarToToday)
+                {
+                    _ = ResetCalendarToTodayAsync();
+                }
+            });
         }
 
-        public async Task ShowMainWindowAsync()
+        public async Task ShowMainWindowAsync(bool resetCalendarToToday = true)
         {
             if (_uiDispatcherQueue?.HasThreadAccess == true)
             {
                 ShowMainWindowCore();
+                if (resetCalendarToToday)
+                {
+                    _ = ResetCalendarToTodayAsync();
+                }
                 return;
             }
 
@@ -137,6 +153,10 @@ namespace OpenPatro
                     try
                     {
                         ShowMainWindowCore();
+                        if (resetCalendarToToday)
+                        {
+                            _ = ResetCalendarToTodayAsync();
+                        }
                         tcs.TrySetResult(null);
                     }
                     catch (Exception ex)
@@ -251,10 +271,23 @@ namespace OpenPatro
             {
                 _midnightSubscription = Services.Clock.ScheduleDailyMidnightCallback(() =>
                 {
-                    _ = MainViewModel.Calendar.InitializeAsync();
-                    _ = _trayCalendarViewModel?.InitializeAsync();
-                    _ = Services.CalendarSync.RunSilentRefreshAsync();
-                    _ = RefreshTrayPresentationAsync();
+                    var dispatcher = _uiDispatcherQueue;
+                    if (dispatcher is null)
+                    {
+                        Log("MidnightTick: UI dispatcher unavailable");
+                        return;
+                    }
+
+                    if (dispatcher.HasThreadAccess)
+                    {
+                        _ = HandleMidnightTickAsync();
+                        return;
+                    }
+
+                    if (!dispatcher.TryEnqueue(() => _ = HandleMidnightTickAsync()))
+                    {
+                        Log("MidnightTick: failed to enqueue on UI dispatcher");
+                    }
                 });
 
                 _ = Services.CalendarSync.RunSilentRefreshAsync();
@@ -266,11 +299,67 @@ namespace OpenPatro
             }
         }
 
+        private async Task HandleMidnightTickAsync()
+        {
+            try
+            {
+                await MainViewModel.Calendar.InitializeAsync();
+                if (_trayCalendarViewModel is not null)
+                {
+                    await _trayCalendarViewModel.InitializeAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"MidnightTick calendar refresh FAILED: {ex}");
+            }
+
+            try
+            {
+                await Services.CalendarSync.RunSilentRefreshAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"MidnightTick sync FAILED: {ex}");
+            }
+
+            try
+            {
+                await RefreshTrayPresentationAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"MidnightTick tray refresh FAILED: {ex}");
+            }
+        }
+
         public async Task OpenMainWindowForDateAsync(int year, int month, int day)
         {
             HideTrayPopupWindow();
-            await ShowMainWindowAsync();
+            await ShowMainWindowAsync(resetCalendarToToday: false);
             await MainViewModel.SelectCalendarDateAsync(year, month, day);
+        }
+
+        private async Task ResetCalendarToTodayAsync()
+        {
+            if (_calendarResetInProgress)
+            {
+                return;
+            }
+
+            _calendarResetInProgress = true;
+            try
+            {
+                await MainViewModel.Calendar.InitializeAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"ResetCalendarToToday FAILED: {ex}");
+            }
+            finally
+            {
+                _calendarResetInProgress = false;
+            }
         }
 
         public async Task RefreshTrayPresentationAsync()
@@ -743,8 +832,15 @@ namespace OpenPatro
 
         private async void OpenCalendarMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            HideTrayPopupWindow();
-            await ShowMainWindowAsync();
+            try
+            {
+                HideTrayPopupWindow();
+                await ShowMainWindowAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"OpenCalendarMenuItem_Click FAILED: {ex}");
+            }
         }
 
         private void StartupMenuItem_Click(object sender, RoutedEventArgs e)

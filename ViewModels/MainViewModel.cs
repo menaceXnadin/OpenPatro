@@ -12,6 +12,9 @@ public sealed class MainViewModel : BindableBase
         Calendar = new CalendarViewModel(services);
         Search = new SearchViewModel(services);
         Settings = new SettingsViewModel(services);
+        Rashifal = new RashifalViewModel(services);
+        ShubhaSait = new ShubhaSaitViewModel(services);
+        DateConverter = new DateConverterViewModel(services);
     }
 
     public CalendarViewModel Calendar { get; }
@@ -20,35 +23,71 @@ public sealed class MainViewModel : BindableBase
 
     public SettingsViewModel Settings { get; }
 
+    public RashifalViewModel Rashifal { get; }
+
+    public ShubhaSaitViewModel ShubhaSait { get; }
+
+    public DateConverterViewModel DateConverter { get; }
+
     public ShellSection SelectedSection
     {
         get => _selectedSection;
         set
         {
+            if (value == ShellSection.Search)
+            {
+                value = ShellSection.Calendar;
+            }
+
             if (SetProperty(ref _selectedSection, value))
             {
                 RaisePropertyChanged(nameof(IsCalendarVisible));
                 RaisePropertyChanged(nameof(IsSearchVisible));
                 RaisePropertyChanged(nameof(IsSettingsVisible));
+                RaisePropertyChanged(nameof(IsRashifalVisible));
+                RaisePropertyChanged(nameof(IsShubhaSaitVisible));
+                RaisePropertyChanged(nameof(IsDateConverterVisible));
             }
         }
     }
 
     public bool IsCalendarVisible => SelectedSection == ShellSection.Calendar;
 
-    public bool IsSearchVisible => SelectedSection == ShellSection.Search;
+    public bool IsSearchVisible => false;
 
     public bool IsSettingsVisible => SelectedSection == ShellSection.Settings;
+
+    public bool IsRashifalVisible => SelectedSection == ShellSection.Rashifal;
+
+    public bool IsShubhaSaitVisible => SelectedSection == ShellSection.ShubhaSait;
+
+    public bool IsDateConverterVisible => SelectedSection == ShellSection.DateConverter;
 
     public async Task InitializeAsync()
     {
         await Calendar.InitializeAsync();
         await Settings.InitializeAsync();
+
+        // Fire-and-forget: pre-fetch Rashifal and Shubha Sait data in the background.
+        // These run on the UI thread (the HTTP calls are async/non-blocking),
+        // so ObservableCollection mutations are safe for WinUI data bindings.
+        _ = SafeInitializeAsync(Rashifal);
+        _ = SafeInitializeAsync(ShubhaSait);
     }
 
     public async Task SelectCalendarDateAsync(int year, int month, int day)
     {
         SelectedSection = ShellSection.Calendar;
         await Calendar.SelectCalendarDateAsync(year, month, day);
+    }
+
+    private static async Task SafeInitializeAsync(RashifalViewModel vm)
+    {
+        try { await vm.InitializeAsync(); } catch { /* Network failure during pre-fetch is OK */ }
+    }
+
+    private static async Task SafeInitializeAsync(ShubhaSaitViewModel vm)
+    {
+        try { await vm.InitializeAsync(); } catch { /* Network failure during pre-fetch is OK */ }
     }
 }

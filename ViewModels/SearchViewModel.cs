@@ -1,7 +1,10 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Microsoft.UI.Xaml;
 using OpenPatro.Infrastructure;
 using OpenPatro.Services;
 
@@ -12,12 +15,20 @@ public sealed class SearchViewModel : BindableBase
     private readonly AppServices _services;
     private string _query = string.Empty;
     private bool _isBusy;
+    private string _statusMessage = "Type to search by event, tithi, date, or note.";
+    private CancellationTokenSource? _queryDebounceCts;
 
     public SearchViewModel(AppServices services)
     {
         _services = services;
         SearchCommand = new AsyncRelayCommand(SearchAsync, () => !string.IsNullOrWhiteSpace(Query) && !IsBusy);
         OpenResultCommand = new AsyncRelayCommand(OpenResultAsync);
+        Results.CollectionChanged += (_, _) =>
+        {
+            RaisePropertyChanged(nameof(HasResults));
+            RaisePropertyChanged(nameof(ShowStatusMessage));
+            RaisePropertyChanged(nameof(StatusVisibility));
+        };
     }
 
     public ObservableCollection<SearchResultViewModel> Results { get; } = new();
@@ -34,9 +45,22 @@ public sealed class SearchViewModel : BindableBase
             if (SetProperty(ref _query, value))
             {
                 ((AsyncRelayCommand)SearchCommand).NotifyCanExecuteChanged();
+                ScheduleLiveSearch();
             }
         }
     }
+
+    public bool HasResults => Results.Count > 0;
+
+    public bool ShowStatusMessage => IsBusy || !HasResults;
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        private set => SetProperty(ref _statusMessage, value);
+    }
+
+    public Visibility StatusVisibility => ShowStatusMessage ? Visibility.Visible : Visibility.Collapsed;
 
     public bool IsBusy
     {
@@ -46,6 +70,8 @@ public sealed class SearchViewModel : BindableBase
             if (SetProperty(ref _isBusy, value))
             {
                 ((AsyncRelayCommand)SearchCommand).NotifyCanExecuteChanged();
+                RaisePropertyChanged(nameof(ShowStatusMessage));
+                RaisePropertyChanged(nameof(StatusVisibility));
             }
         }
     }
@@ -58,10 +84,12 @@ public sealed class SearchViewModel : BindableBase
         if (trimmedQuery.Length == 0)
         {
             Results.Clear();
+            StatusMessage = "Type to search by event, tithi, date, or note.";
             return;
         }
 
         IsBusy = true;
+        StatusMessage = "Searching...";
         try
         {
             Results.Clear();
@@ -95,10 +123,58 @@ public sealed class SearchViewModel : BindableBase
                     BsDay = int.Parse(parts[2])
                 });
             }
+
+            if (Results.Count == 0)
+            {
+                StatusMessage = "No results found.";
+            }
         }
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    private void ScheduleLiveSearch()
+    {
+        _queryDebounceCts?.Cancel();
+
+        if (string.IsNullOrWhiteSpace(Query))
+        {
+            Results.Clear();
+            StatusMessage = "Type to search by event, tithi, date, or note.";
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _queryDebounceCts = cts;
+        _ = RunDebouncedSearchAsync(cts);
+    }
+
+    private async Task RunDebouncedSearchAsync(CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(300, cts.Token);
+            if (!cts.Token.IsCancellationRequested && SearchCommand.CanExecute(null))
+            {
+                SearchCommand.Execute(null);
+            }
+        }
+        catch (TaskCanceledException)
+        {
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_queryDebounceCts, cts))
+            {
+                _queryDebounceCts = null;
+            }
+
+            cts.Dispose();
         }
     }
 

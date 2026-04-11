@@ -1,10 +1,16 @@
 using System;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace OpenPatro.Services;
 
 public class ApplicationPaths
 {
+    private const int AppModelErrorNoPackage = 15700;
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetCurrentPackageFullName(ref int packageFullNameLength, string? packageFullName);
+
     protected internal ApplicationPaths(string localFolderPath)
     {
         LocalFolderPath = localFolderPath;
@@ -26,23 +32,18 @@ public class ApplicationPaths
 
     public static ApplicationPaths Create()
     {
-        string localFolderPath;
-
-        // Try the packaged (MSIX) path first.
-        try
-        {
-            localFolderPath = Windows.Storage.ApplicationData.Current.LocalFolder.Path;
-        }
-        catch
-        {
-            // Not running as a packaged app – fall back to a folder next to the exe,
-            // or to %LocalAppData%\OpenPatro when that is not writable.
-            localFolderPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "OpenPatro");
-        }
+        var localFolderPath = IsRunningAsPackagedApp()
+            ? Windows.Storage.ApplicationData.Current.LocalFolder.Path
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenPatro");
 
         Directory.CreateDirectory(localFolderPath);
         return new ApplicationPaths(localFolderPath);
+    }
+
+    private static bool IsRunningAsPackagedApp()
+    {
+        var length = 0;
+        var result = GetCurrentPackageFullName(ref length, null);
+        return result != AppModelErrorNoPackage;
     }
 }

@@ -1,10 +1,10 @@
 {
   "profiles": {
-    "OpenPatro (Package)": {
-      "commandName": "MsixPackage"
-    },
     "OpenPatro (Unpackaged)": {
       "commandName": "Project"
+    },
+    "OpenPatro (Package)": {
+      "commandName": "MsixPackage"
     }
   }
 }

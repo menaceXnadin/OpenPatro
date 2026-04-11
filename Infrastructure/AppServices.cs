@@ -14,7 +14,8 @@ public sealed class AppServices
         CalendarSyncService calendarSync,
         StartupService startup,
         TrayNotificationService notifications,
-        BundledCalendarSeedService bundledSeed)
+        BundledCalendarSeedService bundledSeed,
+        NepaliPatroApiClient nepaliPatroApi)
     {
         Paths = paths;
         Clock = clock;
@@ -25,6 +26,7 @@ public sealed class AppServices
         Startup = startup;
         Notifications = notifications;
         BundledSeed = bundledSeed;
+        NepaliPatroApi = nepaliPatroApi;
     }
 
     public ApplicationPaths Paths { get; }
@@ -45,6 +47,8 @@ public sealed class AppServices
 
     public BundledCalendarSeedService BundledSeed { get; }
 
+    public NepaliPatroApiClient NepaliPatroApi { get; }
+
     public static async Task<AppServices> CreateAsync()
     {
         var paths = ApplicationPaths.Create();
@@ -60,7 +64,8 @@ public sealed class AppServices
         var startup = new StartupService();
         var notifications = new TrayNotificationService(userRepository);
         var bundledSeed = new BundledCalendarSeedService(paths, parser);
+        var nepaliPatroApi = new NepaliPatroApiClient();
 
-        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, calendarSync, startup, notifications, bundledSeed);
+        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi);
     }
 }

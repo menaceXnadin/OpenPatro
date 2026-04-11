@@ -4,5 +4,8 @@ public enum ShellSection
 {
     Calendar,
     Search,
-    Settings
+    Settings,
+    Rashifal,
+    ShubhaSait,
+    DateConverter
 }

@@ -207,6 +207,8 @@ public sealed class CalendarRepository
             return [];
         }
 
+        var adDateIso = TryNormalizeAdDateIso(trimmedQuery) ?? "__NO_AD_DATE_MATCH__";
+
         var results = new List<CalendarDayRecord>();
         await using var connection = new SqliteConnection($"Data Source={_paths.CalendarDatabasePath}");
         await connection.OpenAsync();
@@ -221,12 +223,14 @@ public sealed class CalendarRepository
              OR Tithi LIKE $query
              OR BsFullDate LIKE $query
              OR AdDateText LIKE $query
+             OR AdDateIso = $adDateIso
              OR NepaliWeekday LIKE $query
              OR BsMonthName LIKE $query
             ORDER BY AdDateIso DESC
             LIMIT 100;
             """;
-         command.Parameters.AddWithValue("$query", $"%{trimmedQuery}%");
+        command.Parameters.AddWithValue("$query", $"%{trimmedQuery}%");
+        command.Parameters.AddWithValue("$adDateIso", adDateIso);
 
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())
@@ -235,6 +239,26 @@ public sealed class CalendarRepository
         }
 
         return results;
+    }
+
+    private static string? TryNormalizeAdDateIso(string query)
+    {
+        if (DateOnly.TryParseExact(query, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var isoDate))
+        {
+            return isoDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        if (DateOnly.TryParse(query, CultureInfo.CurrentCulture, DateTimeStyles.AllowWhiteSpaces, out var localDate))
+        {
+            return localDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        if (DateOnly.TryParse(query, CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var invariantDate))
+        {
+            return invariantDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        return null;
     }
 
     public async Task<bool> HasMonthAsync(int year, int month)

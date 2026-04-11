@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Windows.Input;
 
@@ -37,6 +38,10 @@ public sealed class AsyncRelayCommand : ICommand
             _isRunning = true;
             NotifyCanExecuteChanged();
             await _execute(parameter);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"AsyncRelayCommand execution failed: {ex}");
         }
         finally
         {

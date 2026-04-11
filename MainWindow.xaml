@@ -55,7 +55,7 @@
                                         <VisualState x:Name="Checked">
                                             <Storyboard>
                                                 <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ButtonRoot" Storyboard.TargetProperty="Background">
-                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentFillColorDefaultBrush}" />
+                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
                                                 </ObjectAnimationUsingKeyFrames>
                                             </Storyboard>
                                         </VisualState>
@@ -95,9 +95,20 @@
                               Style="{StaticResource RailButtonStyle}">
                     <FontIcon Glyph="&#xE787;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                 </ToggleButton>
-                <ToggleButton x:Name="SearchButton"
-                              Style="{StaticResource RailButtonStyle}">
-                    <FontIcon Glyph="&#xE721;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                <ToggleButton x:Name="RashifalButton"
+                              Style="{StaticResource RailButtonStyle}"
+                              ToolTipService.ToolTip="राशिफल (Rashifal)">
+                    <FontIcon Glyph="&#xE734;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                </ToggleButton>
+                <ToggleButton x:Name="ShubhaSaitButton"
+                              Style="{StaticResource RailButtonStyle}"
+                              ToolTipService.ToolTip="शुभ साइत (Shubha Sait)">
+                    <FontIcon Glyph="&#xE8BF;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                </ToggleButton>
+                <ToggleButton x:Name="DateConverterButton"
+                              Style="{StaticResource RailButtonStyle}"
+                              ToolTipService.ToolTip="मिति रूपान्तरण (Date Converter)">
+                    <FontIcon Glyph="&#xE895;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                 </ToggleButton>
                 <ToggleButton x:Name="SettingsButton"
                               Style="{StaticResource RailButtonStyle}">
@@ -151,9 +162,15 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <Grid x:Name="WeekdayHeaderGrid" Margin="0,0,0,16"
+                            <Grid x:Name="WeekdayHeaderGrid" Margin="0,0,0,16"
                               Width="{Binding ElementName=CalendarDaysView, Path=ActualWidth}"
                               HorizontalAlignment="Left">
+                            <Grid.Resources>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="HorizontalAlignment" Value="Center" />
+                                    <Setter Property="TextAlignment" Value="Center" />
+                                </Style>
+                            </Grid.Resources>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
@@ -257,7 +274,7 @@
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Top"
                                 Visibility="Collapsed"
-                                Background="{ThemeResource LayerFillColorAltBrush}"
+                                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1"
                                 CornerRadius="16"
@@ -265,7 +282,9 @@
                             <Border.RenderTransform>
                                 <TranslateTransform x:Name="DetailTransform" X="32" />
                             </Border.RenderTransform>
-                            <StackPanel Spacing="12">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel Spacing="12">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -309,48 +328,11 @@
                                         HorizontalAlignment="Left">
                                     Save note
                                 </Button>
-                            </StackPanel>
+                                </StackPanel>
+                            </ScrollViewer>
                         </Border>
                     </Grid>
                 </Grid>
-            </Grid>
-
-            <Grid x:Name="SearchSection"
-                  Visibility="Collapsed">
-                <StackPanel Spacing="16">
-                    <TextBlock Text="Search" FontSize="30" FontWeight="SemiBold" />
-                    <TextBlock Text="Search calendar events and your notes." Opacity="0.72" />
-                    <Grid ColumnSpacing="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="SearchQueryBox"
-                                 Text="{x:Bind ViewModel.Search.Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                 PlaceholderText="Event, tithi, date, note"
-                                 KeyDown="SearchQueryBox_KeyDown" />
-                        <Button Grid.Column="1" Command="{x:Bind ViewModel.Search.SearchCommand, Mode=OneWay}">Search</Button>
-                    </Grid>
-                    <ListView ItemsSource="{x:Bind ViewModel.Search.Results, Mode=OneWay}"
-                              IsItemClickEnabled="True"
-                              ItemClick="SearchResultsView_ItemClick"
-                              SelectionMode="None">
-                        <ListView.ItemTemplate>
-                            <DataTemplate>
-                                <Border Padding="16"
-                                        Margin="0,0,0,8"
-                                        CornerRadius="12"
-                                        Background="{ThemeResource LayerFillColorAltBrush}">
-                                    <StackPanel Spacing="6">
-                                        <TextBlock Text="{Binding Title}" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="18" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding Subtitle}" Opacity="0.72" />
-                                        <TextBlock Text="{Binding NotePreview}" Opacity="0.72" TextWrapping="Wrap" />
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
-                </StackPanel>
             </Grid>
 
             <Grid x:Name="SettingsSection"
@@ -376,6 +358,330 @@
                     </Border>
                 </StackPanel>
             </Grid>
+
+            <Grid x:Name="RashifalSection"
+                  Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="राशिफल"
+                                   FontFamily="{StaticResource AppNepaliFontFamily}"
+                                   FontSize="34"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="Rashifal — Horoscope"
+                                   Opacity="0.68"
+                                   FontSize="14" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Command="{x:Bind ViewModel.Rashifal.RefreshCommand, Mode=OneWay}"
+                            VerticalAlignment="Top">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                            <TextBlock Text="Refresh" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="16" Margin="0,0,16,0">
+                        <ProgressRing IsActive="{x:Bind ViewModel.Rashifal.IsBusy, Mode=OneWay}"
+                                      Visibility="{x:Bind BoolToVisibility(ViewModel.Rashifal.IsBusy), Mode=OneWay}"
+                                      Width="32" Height="32"
+                                      HorizontalAlignment="Left" />
+                        <TextBlock Text="{x:Bind ViewModel.Rashifal.ErrorMessage, Mode=OneWay}"
+                                   Visibility="{x:Bind StringToVisibility(ViewModel.Rashifal.ErrorMessage), Mode=OneWay}"
+                                   Foreground="#FF6B6B"
+                                   TextWrapping="Wrap" />
+                        <Border Padding="20" CornerRadius="16"
+                                Background="{ThemeResource LayerFillColorAltBrush}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="RashifalTypePicker"
+                                          Header="प्रकार (Type)"
+                                          SelectedIndex="0"
+                                          HorizontalAlignment="Stretch"
+                                          SelectionChanged="RashifalTypePicker_SelectionChanged">
+                                    <ComboBoxItem Content="दैनिक (Daily)" Tag="D" />
+                                    <ComboBoxItem Content="साप्ताहिक (Weekly)" Tag="W" />
+                                    <ComboBoxItem Content="मासिक (Monthly)" Tag="M" />
+                                    <ComboBoxItem Content="वार्षिक (Yearly)" Tag="Y" />
+                                </ComboBox>
+                                <ComboBox x:Name="RashifalZodiacPicker"
+                                          Grid.Column="1"
+                                          Header="राशि (Zodiac Sign)"
+                                          SelectedIndex="0"
+                                          Margin="16,0,0,0"
+                                          HorizontalAlignment="Stretch"
+                                          SelectionChanged="RashifalZodiacPicker_SelectionChanged">
+                                    <ComboBoxItem Content="मेष (Aries)" Tag="aries" />
+                                    <ComboBoxItem Content="वृष (Taurus)" Tag="taurus" />
+                                    <ComboBoxItem Content="मिथुन (Gemini)" Tag="gemini" />
+                                    <ComboBoxItem Content="कर्कट (Cancer)" Tag="cancer" />
+                                    <ComboBoxItem Content="सिंह (Leo)" Tag="leo" />
+                                    <ComboBoxItem Content="कन्या (Virgo)" Tag="virgo" />
+                                    <ComboBoxItem Content="तुला (Libra)" Tag="libra" />
+                                    <ComboBoxItem Content="वृश्चिक (Scorpio)" Tag="scorpio" />
+                                    <ComboBoxItem Content="धनु (Sagittarius)" Tag="sagittarius" />
+                                    <ComboBoxItem Content="मकर (Capricorn)" Tag="capricorn" />
+                                    <ComboBoxItem Content="कुम्भ (Aquarius)" Tag="aquarius" />
+                                    <ComboBoxItem Content="मीन (Pisces)" Tag="pisces" />
+                                </ComboBox>
+                            </Grid>
+                        </Border>
+                        <Border Padding="20" CornerRadius="16"
+                                Background="{ThemeResource LayerFillColorAltBrush}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="{x:Bind ViewModel.Rashifal.Title, Mode=OneWay}"
+                                           FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="16"
+                                           FontWeight="SemiBold"
+                                           TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="Valid for:" Opacity="0.56" FontSize="13" />
+                                    <TextBlock Text="{x:Bind ViewModel.Rashifal.ValidForDate, Mode=OneWay}"
+                                               Opacity="0.56" FontSize="13" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="24" CornerRadius="16"
+                                Background="{ThemeResource LayerFillColorAltBrush}"
+                                MinHeight="200">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="भविष्यवाणी"
+                                           FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="18"
+                                           FontWeight="SemiBold" />
+                                <TextBlock Text="{x:Bind ViewModel.Rashifal.PredictionText, Mode=OneWay}"
+                                           FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="15"
+                                           TextWrapping="Wrap"
+                                           LineHeight="28" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid x:Name="ShubhaSaitSection"
+                  Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Margin="0,0,0,24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="शुभ साइत"
+                                   FontFamily="{StaticResource AppNepaliFontFamily}"
+                                   FontSize="34"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="Shubha Sait — Auspicious Dates"
+                                   Opacity="0.68"
+                                   FontSize="14" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Click="SaitRefreshButton_Click"
+                            VerticalAlignment="Top">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                            <TextBlock Text="Refresh" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="16" Margin="0,0,16,0">
+                        <ProgressRing IsActive="{x:Bind ViewModel.ShubhaSait.IsBusy, Mode=OneWay}"
+                                      Visibility="{x:Bind BoolToVisibility(ViewModel.ShubhaSait.IsBusy), Mode=OneWay}"
+                                      Width="32" Height="32"
+                                      HorizontalAlignment="Left" />
+                        <TextBlock Text="{x:Bind ViewModel.ShubhaSait.ErrorMessage, Mode=OneWay}"
+                                   Visibility="{x:Bind StringToVisibility(ViewModel.ShubhaSait.ErrorMessage), Mode=OneWay}"
+                                   Foreground="#FF6B6B"
+                                   TextWrapping="Wrap" />
+                        <Border Padding="20" CornerRadius="16"
+                                Background="{ThemeResource LayerFillColorAltBrush}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox x:Name="SaitYearPicker"
+                                          Header="वर्ष (Year)"
+                                          ItemsSource="{x:Bind ViewModel.ShubhaSait.AvailableYears, Mode=OneWay}"
+                                          HorizontalAlignment="Stretch"
+                                          SelectionChanged="SaitYearPicker_SelectionChanged" />
+                                <ComboBox x:Name="SaitCategoryPicker"
+                                          Grid.Column="1"
+                                          Header="वर्ग (Category)"
+                                          ItemsSource="{x:Bind ViewModel.ShubhaSait.AvailableCategories, Mode=OneWay}"
+                                          DisplayMemberPath="NepaliName"
+                                          Margin="16,0,0,0"
+                                          HorizontalAlignment="Stretch"
+                                          SelectionChanged="SaitCategoryPicker_SelectionChanged" />
+                                <ComboBox x:Name="SaitMonthPicker"
+                                          Grid.Column="2"
+                                          Header="महिना (Month)"
+                                          ItemsSource="{x:Bind ViewModel.ShubhaSait.AvailableMonths, Mode=OneWay}"
+                                          DisplayMemberPath="DisplayName"
+                                          Margin="16,0,0,0"
+                                          HorizontalAlignment="Stretch"
+                                          SelectionChanged="SaitMonthPicker_SelectionChanged" />
+                            </Grid>
+                        </Border>
+                        <Border Padding="24" CornerRadius="16"
+                                Background="{ThemeResource LayerFillColorAltBrush}"
+                                MinHeight="120">
+                            <StackPanel Spacing="16">
+                                <TextBlock Text="शुभ दिनहरू (Auspicious Days)"
+                                           FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="18"
+                                           FontWeight="SemiBold" />
+                                <GridView ItemsSource="{x:Bind ViewModel.ShubhaSait.AuspiciousDays, Mode=OneWay}"
+                                          SelectionMode="None"
+                                          IsItemClickEnabled="False"
+                                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <GridView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="56" Height="56" CornerRadius="28"
+                                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                    Margin="4">
+                                                <TextBlock Text="{Binding}"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           FontSize="20"
+                                                           FontWeight="SemiBold" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </GridView.ItemTemplate>
+                                </GridView>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <Grid x:Name="DateConverterSection"
+                  Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Margin="0,0,0,24">
+                    <StackPanel>
+                        <TextBlock Text="मिति रूपान्तरण"
+                                   FontFamily="{StaticResource AppNepaliFontFamily}"
+                                   FontSize="34"
+                                   FontWeight="SemiBold" />
+                        <TextBlock Text="Date Converter — BS ↔ AD"
+                                   Opacity="0.68"
+                                   FontSize="14" />
+                    </StackPanel>
+                </Grid>
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="16" Margin="0,0,16,0">
+                        <ProgressRing IsActive="{x:Bind ViewModel.DateConverter.IsBusy, Mode=OneWay}"
+                                      Visibility="{x:Bind BoolToVisibility(ViewModel.DateConverter.IsBusy), Mode=OneWay}"
+                                      Width="32" Height="32"
+                                      HorizontalAlignment="Left" />
+                        <TextBlock Text="{x:Bind ViewModel.DateConverter.ErrorMessage, Mode=OneWay}"
+                                   Visibility="{x:Bind StringToVisibility(ViewModel.DateConverter.ErrorMessage), Mode=OneWay}"
+                                   Foreground="#FF6B6B"
+                                   TextWrapping="Wrap" />
+                        <Border Padding="20" CornerRadius="16"
+                                Background="{ThemeResource LayerFillColorAltBrush}">
+                            <StackPanel Spacing="16">
+                                <ComboBox x:Name="DateConverterDirectionPicker"
+                                          Header="Direction"
+                                          SelectedIndex="0"
+                                          HorizontalAlignment="Stretch"
+                                          SelectionChanged="DateConverterDirection_SelectionChanged">
+                                    <ComboBoxItem Content="BS → AD (बि.सं. → ई.सं.)" Tag="BS" />
+                                    <ComboBoxItem Content="AD → BS (ई.सं. → बि.सं.)" Tag="AD" />
+                                </ComboBox>
+                                <TextBox Header="Date (YYYY-MM-DD)"
+                                         PlaceholderText="e.g. 2082-12-28"
+                                         Text="{x:Bind ViewModel.DateConverter.InputDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Command="{x:Bind ViewModel.DateConverter.ConvertCommand, Mode=OneWay}"
+                                            Style="{ThemeResource AccentButtonStyle}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE895;" FontSize="14" />
+                                            <TextBlock Text="Convert" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Command="{x:Bind ViewModel.DateConverter.RefreshCommand, Mode=OneWay}">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                                            <TextBlock Text="Re-convert" />
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="24" CornerRadius="16"
+                                Background="{ThemeResource LayerFillColorAltBrush}"
+                                Visibility="{x:Bind BoolToVisibility(ViewModel.DateConverter.HasResult), Mode=OneWay}">
+                            <StackPanel Spacing="16">
+                                <TextBlock Text="रूपान्तरण परिणाम (Conversion Result)"
+                                           FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="20"
+                                           FontWeight="SemiBold" />
+                                <Grid RowSpacing="12" ColumnSpacing="24">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Text="AD Date (ई.सं.)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{x:Bind ViewModel.DateConverter.ResultAdDate, Mode=OneWay}"
+                                               FontWeight="SemiBold" FontSize="16" />
+                                    <TextBlock Grid.Row="1" Text="BS Date (बि.सं.)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1"
+                                               Text="{x:Bind ViewModel.DateConverter.ResultBsDate, Mode=OneWay}"
+                                               FontWeight="SemiBold" FontSize="16" />
+                                    <TextBlock Grid.Row="2" Text="Tithi (तिथि)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1"
+                                               Text="{x:Bind ViewModel.DateConverter.ResultTithiLabel, Mode=OneWay}" />
+                                    <TextBlock Grid.Row="3" Text="Nepal Sambat (ने.सं.)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1"
+                                               Text="{x:Bind ViewModel.DateConverter.ResultNsYear, Mode=OneWay}" />
+                                    <TextBlock Grid.Row="4" Text="Chandrama (चन्द्रमा)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
+                                    <TextBlock Grid.Row="4" Grid.Column="1"
+                                               Text="{x:Bind ViewModel.DateConverter.ResultChandrama, Mode=OneWay}" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
         </Grid>
     </Grid>
 </Window>

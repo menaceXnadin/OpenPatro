@@ -122,6 +122,8 @@ public sealed class CalendarViewModel : BindableBase
 
     public async Task InitializeAsync()
     {
+        ClearSelection();
+
         var today = await _services.CalendarRepository.GetTodayAsync();
         SetTodayRecord(today);
         if (today is null)
@@ -133,11 +135,6 @@ public sealed class CalendarViewModel : BindableBase
         }
 
         await LoadMonthAsync(today.BsYear, today.BsMonth);
-        var todayCell = Days.FirstOrDefault(day => day.Record.BsYear == today.BsYear && day.Record.BsMonth == today.BsMonth && day.Record.BsDay == today.BsDay);
-        if (todayCell is not null)
-        {
-            await SelectDayAsync(todayCell);
-        }
     }
 
     public async Task EnsureLoadedAsync()
