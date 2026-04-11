@@ -17,6 +17,11 @@ namespace OpenPatro
         private const uint WmGetMinMaxInfo = 0x0024;
         private const double MinWindowWidthDip = 1160;
         private const double MinWindowHeightDip = 1050;
+        private const double AbsoluteMinWindowWidthDip = 800;
+        private const double AbsoluteMinWindowHeightDip = 600;
+        private const double MinWindowWidthWorkAreaRatio = 0.72;
+        private const double MinWindowHeightWorkAreaRatio = 0.88;
+        private const int WindowWorkAreaPaddingPx = 24;
         private const int DwmaUseImmersiveDarkModeBefore20H1 = 19;
         private const int DwmaUseImmersiveDarkMode = 20;
 
@@ -26,6 +31,9 @@ namespace OpenPatro
         private bool _initialWindowSizeApplied;
         private OverlappedPresenterState _lastPresenterState = OverlappedPresenterState.Restored;
         private bool _suppressSaitSelectionEvents;
+        private bool _suppressDateConverterInputSync;
+        private bool _suppressNavCheckedEvents;
+        private bool _suppressCalendarNavigationSelectionEvents;
 
         private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -90,12 +98,18 @@ namespace OpenPatro
 
             ConfigureWindowResizeBehavior();
             ApplyInitialWindowSize();
+            CenterWindowOnCurrentDisplay();
 
             CalendarButton.Checked += CalendarButton_Checked;
+            CalendarButton.Unchecked += NavButton_Unchecked;
             SettingsButton.Checked += SettingsButton_Checked;
+            SettingsButton.Unchecked += NavButton_Unchecked;
             RashifalButton.Checked += RashifalButton_Checked;
+            RashifalButton.Unchecked += NavButton_Unchecked;
             ShubhaSaitButton.Checked += ShubhaSaitButton_Checked;
+            ShubhaSaitButton.Unchecked += NavButton_Unchecked;
             DateConverterButton.Checked += DateConverterButton_Checked;
+            DateConverterButton.Unchecked += NavButton_Unchecked;
 
             CalendarButton.IsChecked = ViewModel.SelectedSection == ShellSection.Calendar;
             SettingsButton.IsChecked = ViewModel.SelectedSection == ShellSection.Settings;
@@ -104,6 +118,8 @@ namespace OpenPatro
             DateConverterButton.IsChecked = ViewModel.SelectedSection == ShellSection.DateConverter;
             UpdateSectionVisibility();
             UpdateCalendarLayout();
+            SyncCalendarNavigationSelections();
+            SyncDateConverterInputParts();
 
             if (AppWindow.Presenter is OverlappedPresenter presenter)
             {
@@ -121,18 +137,21 @@ namespace OpenPatro
 
         private void CalendarButton_Checked(object sender, RoutedEventArgs e)
         {
+            if (_suppressNavCheckedEvents) return;
             ViewModel.SelectedSection = ShellSection.Calendar;
             UpdateSectionVisibility();
         }
 
         private void SettingsButton_Checked(object sender, RoutedEventArgs e)
         {
+            if (_suppressNavCheckedEvents) return;
             ViewModel.SelectedSection = ShellSection.Settings;
             UpdateSectionVisibility();
         }
 
         private async void RashifalButton_Checked(object sender, RoutedEventArgs e)
         {
+            if (_suppressNavCheckedEvents) return;
             ViewModel.SelectedSection = ShellSection.Rashifal;
             UpdateSectionVisibility();
             await ViewModel.Rashifal.InitializeAsync();
@@ -140,6 +159,7 @@ namespace OpenPatro
 
         private async void ShubhaSaitButton_Checked(object sender, RoutedEventArgs e)
         {
+            if (_suppressNavCheckedEvents) return;
             ViewModel.SelectedSection = ShellSection.ShubhaSait;
             UpdateSectionVisibility();
             _suppressSaitSelectionEvents = true;
@@ -150,8 +170,23 @@ namespace OpenPatro
 
         private void DateConverterButton_Checked(object sender, RoutedEventArgs e)
         {
+            if (_suppressNavCheckedEvents) return;
             ViewModel.SelectedSection = ShellSection.DateConverter;
             UpdateSectionVisibility();
+            SyncDateConverterInputParts();
+        }
+
+        // Prevent the user from unchecking the currently active nav button
+        // by clicking it a second time (ToggleButton default behavior).
+        private void NavButton_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressNavCheckedEvents) return;
+            if (sender is ToggleButton btn)
+            {
+                _suppressNavCheckedEvents = true;
+                btn.IsChecked = true;
+                _suppressNavCheckedEvents = false;
+            }
         }
 
         private void CloseDetailPanel_Click(object sender, RoutedEventArgs e)
@@ -198,24 +233,24 @@ namespace OpenPatro
             ShubhaSaitSection.Visibility = ViewModel.IsShubhaSaitVisible ? Visibility.Visible : Visibility.Collapsed;
             DateConverterSection.Visibility = ViewModel.IsDateConverterVisible ? Visibility.Visible : Visibility.Collapsed;
 
-            SyncToggleButton("CalendarButton", ViewModel.IsCalendarVisible);
-            SyncToggleButton("SettingsButton", ViewModel.IsSettingsVisible);
-            SyncToggleButton("RashifalButton", ViewModel.IsRashifalVisible);
-            SyncToggleButton("ShubhaSaitButton", ViewModel.IsShubhaSaitVisible);
-            SyncToggleButton("DateConverterButton", ViewModel.IsDateConverterVisible);
-        }
+            var activeButton = ViewModel.SelectedSection switch
+            {
+                ShellSection.Settings => SettingsButton,
+                ShellSection.Rashifal => RashifalButton,
+                ShellSection.ShubhaSait => ShubhaSaitButton,
+                ShellSection.DateConverter => DateConverterButton,
+                _ => CalendarButton
+            };
 
-        private void SyncToggleButton(string name, bool isChecked)
-        {
-            var element = RootGrid?.FindName(name);
-            if (element is ToggleButton toggle)
-            {
-                toggle.IsChecked = isChecked;
-            }
-            else if (element is RadioButton radio)
-            {
-                radio.IsChecked = isChecked;
-            }
+            // Guard against Checked/Unchecked event re-entry when we set
+            // IsChecked programmatically below.
+            _suppressNavCheckedEvents = true;
+            CalendarButton.IsChecked = ReferenceEquals(activeButton, CalendarButton);
+            RashifalButton.IsChecked = ReferenceEquals(activeButton, RashifalButton);
+            ShubhaSaitButton.IsChecked = ReferenceEquals(activeButton, ShubhaSaitButton);
+            DateConverterButton.IsChecked = ReferenceEquals(activeButton, DateConverterButton);
+            SettingsButton.IsChecked = ReferenceEquals(activeButton, SettingsButton);
+            _suppressNavCheckedEvents = false;
         }
 
         private void UpdateCalendarLayout()
@@ -235,46 +270,81 @@ namespace OpenPatro
                 return;
             }
 
-            const double minItemWidth = 92;
-            const double restoredMaxItemWidth = 144;
-            const double maximizedMaxItemWidth = 260;
-            const double itemHeightRatio = 0.98;
+            const int columns = 7;
+            const int rows = 6;
+            const double minCellSize = 72;
+            const double maxCellSize = 260;
+            const double cellAspectRatio = 0.92; // height = width * ratio
 
-            var isMaximized = AppWindow.Presenter is OverlappedPresenter presenter
-                              && presenter.State == OverlappedPresenterState.Maximized;
+            // The weekday header strip Border wraps the inner grid.
+            var weekdayHeaderParent = weekdayHeader.Parent as Microsoft.UI.Xaml.Controls.Border;
+            var headerHeight = weekdayHeaderParent?.ActualHeight ?? weekdayHeader.ActualHeight;
+            // 10 = margin below the weekday header border
+            var availableHeight = Math.Max(0, layoutHost.ActualHeight - headerHeight - 10);
 
-            var itemWidth = Math.Floor(availableWidth / 7d);
-            if (isMaximized)
+            // Compute the cell width that would fill width vs. height independently.
+            var widthFromAvailableWidth = Math.Floor(availableWidth / columns);
+            var widthFromAvailableHeight = Math.Floor(availableHeight / rows / cellAspectRatio);
+
+            // Use the smaller so the 7×6 grid fits in BOTH dimensions.
+            var itemWidth = Math.Min(widthFromAvailableWidth, widthFromAvailableHeight);
+            itemWidth = Math.Clamp(itemWidth, minCellSize, maxCellSize);
+
+            var itemHeight = Math.Floor(itemWidth * cellAspectRatio);
+            itemHeight = Math.Clamp(itemHeight, minCellSize * cellAspectRatio, maxCellSize * cellAspectRatio);
+
+            // Small buffer (+4px) accounts for the GridView's internal ScrollViewer/Border
+            // overhead that would otherwise eat into the exact 7*itemWidth, causing
+            // the ItemsWrapGrid to wrap at 6 columns instead of 7.
+            var gridWidth = (itemWidth * columns) + 4;
+            calendarDaysView.Width = gridWidth;
+
+            // Always center the grid so there is no dead space on the right.
+            if (weekdayHeaderParent is not null)
             {
-                itemWidth = Math.Clamp(itemWidth, minItemWidth, maximizedMaxItemWidth);
+                weekdayHeaderParent.Width = gridWidth;
+                weekdayHeaderParent.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
             }
             else
             {
-                itemWidth = Math.Clamp(itemWidth, minItemWidth, restoredMaxItemWidth);
+                weekdayHeader.Width = gridWidth;
+                weekdayHeader.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
             }
 
-            var availableHeight = Math.Max(0, layoutHost.ActualHeight - weekdayHeader.ActualHeight - 16);
-            var itemHeight = isMaximized
-                ? Math.Max(88, Math.Floor(availableHeight / 6d))
-                : Math.Floor(itemWidth * itemHeightRatio);
-
-            var gridWidth = itemWidth * 7;
-            weekdayHeader.Width = gridWidth;
-            calendarDaysView.Width = gridWidth;
-
-            weekdayHeader.HorizontalAlignment = isMaximized
-                ? Microsoft.UI.Xaml.HorizontalAlignment.Center
-                : Microsoft.UI.Xaml.HorizontalAlignment.Left;
-            calendarDaysView.HorizontalAlignment = isMaximized
-                ? Microsoft.UI.Xaml.HorizontalAlignment.Center
-                : Microsoft.UI.Xaml.HorizontalAlignment.Left;
+            calendarDaysView.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
 
             panel.ItemWidth = itemWidth;
             panel.ItemHeight = itemHeight;
         }
 
+        private void CenterWindowOnCurrentDisplay()
+        {
+            try
+            {
+                var displayArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
+                var workArea = displayArea.WorkArea;
+                var size = AppWindow.Size;
+
+                var centeredX = workArea.X + ((workArea.Width - size.Width) / 2);
+                var centeredY = workArea.Y + ((workArea.Height - size.Height) / 2);
+
+                AppWindow.Move(new Windows.Graphics.PointInt32(centeredX, centeredY));
+            }
+            catch
+            {
+                // Best-effort centering only.
+            }
+        }
+
         private void Calendar_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(CalendarViewModel.SelectedNavigationYear)
+                || e.PropertyName == nameof(CalendarViewModel.SelectedNavigationMonth)
+                || e.PropertyName == nameof(CalendarViewModel.MonthTitleNepali))
+            {
+                SyncCalendarNavigationSelections();
+            }
+
             if (e.PropertyName == nameof(CalendarViewModel.SelectedDay))
             {
                 if (ViewModel.Calendar.SelectedDay is null)
@@ -294,6 +364,55 @@ namespace OpenPatro
                     ShowDetailPanel();
                 }
             }
+        }
+
+        private async void CalendarYearPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressCalendarNavigationSelectionEvents)
+            {
+                return;
+            }
+
+            if (CalendarYearPicker.SelectedItem is not int year)
+            {
+                return;
+            }
+
+            _suppressCalendarNavigationSelectionEvents = true;
+            await ViewModel.Calendar.NavigateToYearAsync(year);
+            SyncCalendarNavigationSelections();
+            _suppressCalendarNavigationSelectionEvents = false;
+        }
+
+        private async void CalendarMonthPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressCalendarNavigationSelectionEvents)
+            {
+                return;
+            }
+
+            if (CalendarMonthPicker.SelectedItem is not CalendarViewModel.MonthNavigationOption month)
+            {
+                return;
+            }
+
+            _suppressCalendarNavigationSelectionEvents = true;
+            await ViewModel.Calendar.NavigateToMonthAsync(month.MonthNumber);
+            SyncCalendarNavigationSelections();
+            _suppressCalendarNavigationSelectionEvents = false;
+        }
+
+        private void SyncCalendarNavigationSelections()
+        {
+            if (CalendarYearPicker is null || CalendarMonthPicker is null)
+            {
+                return;
+            }
+
+            _suppressCalendarNavigationSelectionEvents = true;
+            CalendarYearPicker.SelectedItem = ViewModel.Calendar.SelectedNavigationYear;
+            CalendarMonthPicker.SelectedItem = ViewModel.Calendar.SelectedNavigationMonth;
+            _suppressCalendarNavigationSelectionEvents = false;
         }
 
         private void ShowDetailPanel()
@@ -423,18 +542,66 @@ namespace OpenPatro
             _previousWndProc = SetWindowLongPtr(hwnd, GwlpWndProc, newWndProc);
         }
 
+        private static uint GetWindowDpiOrDefault(IntPtr hwnd)
+        {
+            var dpi = GetDpiForWindow(hwnd);
+            return dpi == 0 ? 96u : dpi;
+        }
+
+        private static int DipToPx(double dip, uint dpi)
+        {
+            return (int)Math.Ceiling(dip * dpi / 96.0);
+        }
+
+        private (int minWidthPx, int minHeightPx) GetMinimumWindowSizePx(IntPtr hwnd)
+        {
+            var dpi = GetWindowDpiOrDefault(hwnd);
+            return (DipToPx(AbsoluteMinWindowWidthDip, dpi), DipToPx(AbsoluteMinWindowHeightDip, dpi));
+        }
+
+        private (int WidthPx, int HeightPx) GetTargetWindowSizePx(IntPtr hwnd)
+        {
+            var dpi = GetWindowDpiOrDefault(hwnd);
+
+            var preferredWidthPx = DipToPx(MinWindowWidthDip, dpi);
+            var preferredHeightPx = DipToPx(MinWindowHeightDip, dpi);
+
+            var (absoluteMinWidthPx, absoluteMinHeightPx) = GetMinimumWindowSizePx(hwnd);
+
+            var maxWidthPx = int.MaxValue;
+            var maxHeightPx = int.MaxValue;
+            var targetWidthPx = preferredWidthPx;
+            var targetHeightPx = preferredHeightPx;
+
+            try
+            {
+                var displayArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
+                var workArea = displayArea.WorkArea;
+                maxWidthPx = Math.Max(480, workArea.Width - WindowWorkAreaPaddingPx);
+                maxHeightPx = Math.Max(480, workArea.Height - WindowWorkAreaPaddingPx);
+
+                targetWidthPx = (int)Math.Floor(maxWidthPx * MinWindowWidthWorkAreaRatio);
+                targetHeightPx = (int)Math.Floor(maxHeightPx * MinWindowHeightWorkAreaRatio);
+            }
+            catch
+            {
+                // Fall back to DPI-scaled preferred sizing when monitor work area can't be read.
+            }
+
+            var effectiveMinWidthPx = Math.Min(absoluteMinWidthPx, maxWidthPx);
+            var effectiveMinHeightPx = Math.Min(absoluteMinHeightPx, maxHeightPx);
+
+            var widthPx = Math.Clamp(targetWidthPx, effectiveMinWidthPx, maxWidthPx);
+            var heightPx = Math.Clamp(targetHeightPx, effectiveMinHeightPx, maxHeightPx);
+
+            return (widthPx, heightPx);
+        }
+
         private IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         {
             if (msg == WmGetMinMaxInfo)
             {
-                var dpi = GetDpiForWindow(hWnd);
-                if (dpi == 0)
-                {
-                    dpi = 96;
-                }
-
-                var minWidthPx = (int)Math.Ceiling(MinWindowWidthDip * dpi / 96.0);
-                var minHeightPx = (int)Math.Ceiling(MinWindowHeightDip * dpi / 96.0);
+                var (minWidthPx, minHeightPx) = GetMinimumWindowSizePx(hWnd);
 
                 var minMaxInfo = Marshal.PtrToStructure<MinMaxInfo>(lParam);
                 minMaxInfo.ptMinTrackSize.X = Math.Max(minMaxInfo.ptMinTrackSize.X, minWidthPx);
@@ -459,7 +626,7 @@ namespace OpenPatro
                 return;
             }
 
-            presenter.IsResizable = false;
+            presenter.IsResizable = true;
             presenter.IsMaximizable = true;
             presenter.IsMinimizable = true;
         }
@@ -474,7 +641,7 @@ namespace OpenPatro
             var currentState = presenter.State;
             if (_lastPresenterState == OverlappedPresenterState.Maximized && currentState == OverlappedPresenterState.Restored)
             {
-                _ = TryResizeToMinimumWindowSize();
+                _ = TryResizeToInitialWindowSize();
             }
 
             _lastPresenterState = currentState;
@@ -487,13 +654,13 @@ namespace OpenPatro
                 return;
             }
 
-            if (TryResizeToMinimumWindowSize())
+            if (TryResizeToInitialWindowSize())
             {
                 _initialWindowSizeApplied = true;
             }
         }
 
-        private bool TryResizeToMinimumWindowSize()
+        private bool TryResizeToInitialWindowSize()
         {
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             if (hwnd == IntPtr.Zero)
@@ -501,14 +668,7 @@ namespace OpenPatro
                 return false;
             }
 
-            var dpi = GetDpiForWindow(hwnd);
-            if (dpi == 0)
-            {
-                dpi = 96;
-            }
-
-            var widthPx = (int)Math.Ceiling(MinWindowWidthDip * dpi / 96.0);
-            var heightPx = (int)Math.Ceiling(MinWindowHeightDip * dpi / 96.0);
+            var (widthPx, heightPx) = GetTargetWindowSizePx(hwnd);
 
             try
             {
@@ -560,16 +720,6 @@ namespace OpenPatro
             _suppressSaitSelectionEvents = false;
         }
 
-        private void SaitMonthPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_suppressSaitSelectionEvents) return;
-            if (SaitMonthPicker.SelectedItem is not SaitMonthInfo month) return;
-
-            _suppressSaitSelectionEvents = true;
-            ViewModel.ShubhaSait.SelectedMonth = month.MonthKey;
-            _suppressSaitSelectionEvents = false;
-        }
-
         private async void SaitRefreshButton_Click(object sender, RoutedEventArgs e)
         {
             if (ViewModel.ShubhaSait.IsBusy) return;
@@ -586,6 +736,190 @@ namespace OpenPatro
             {
                 ViewModel.DateConverter.ConversionDirection = direction;
             }
+
+            SyncDateConverterInputParts();
+        }
+
+        private void DateConverterInputPart_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_suppressDateConverterInputSync)
+            {
+                return;
+            }
+
+            UpdateDateConverterInputDateFromControls();
+        }
+
+        private void DateConverterNumericOnly_BeforeTextChanging(TextBox sender, TextBoxBeforeTextChangingEventArgs args)
+        {
+            if (string.IsNullOrEmpty(args.NewText))
+            {
+                return;
+            }
+
+            foreach (var ch in args.NewText)
+            {
+                if (!char.IsDigit(ch))
+                {
+                    args.Cancel = true;
+                    return;
+                }
+            }
+        }
+
+        private void DateConverterMonthPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressDateConverterInputSync)
+            {
+                return;
+            }
+
+            UpdateDateConverterInputDateFromControls();
+        }
+
+        private void UpdateDateConverterInputDateFromControls()
+        {
+            var yearBox = RootGrid?.FindName("DateConverterYearBox") as TextBox;
+            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
+            var dayBox = RootGrid?.FindName("DateConverterDayBox") as TextBox;
+            if (yearBox is null || monthPicker is null || dayBox is null)
+            {
+                return;
+            }
+
+            var yearText = yearBox.Text.Trim();
+            var dayText = dayBox.Text.Trim();
+            var month = 0;
+            if (monthPicker.SelectedItem is ComboBoxItem monthItem
+                && monthItem.Tag is string monthTag
+                && int.TryParse(monthTag, out var parsedMonth))
+            {
+                month = parsedMonth;
+            }
+
+            if (string.IsNullOrEmpty(yearText) && month == 0 && string.IsNullOrEmpty(dayText))
+            {
+                ViewModel.DateConverter.InputDate = string.Empty;
+                return;
+            }
+
+            if (!int.TryParse(yearText, out var year)
+                || !int.TryParse(dayText, out var day)
+                || year <= 0
+                || month is < 1 or > 12
+                || day is < 1 or > 32)
+            {
+                ViewModel.DateConverter.InputDate = string.Empty;
+                return;
+            }
+
+            ViewModel.DateConverter.InputDate = $"{year:0000}-{month:00}-{day:00}";
+        }
+
+        private void DateConverterInputPart_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+        {
+            if (e.Key != VirtualKey.Enter)
+            {
+                return;
+            }
+
+            var yearBox = RootGrid?.FindName("DateConverterYearBox") as TextBox;
+            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
+            var dayBox = RootGrid?.FindName("DateConverterDayBox") as TextBox;
+            var convertButton = RootGrid?.FindName("DateConverterConvertButton") as Button;
+
+            if (ReferenceEquals(sender, yearBox))
+            {
+                monthPicker?.Focus(FocusState.Programmatic);
+            }
+            else if (ReferenceEquals(sender, monthPicker))
+            {
+                dayBox?.Focus(FocusState.Programmatic);
+            }
+            else if (ReferenceEquals(sender, dayBox))
+            {
+                convertButton?.Focus(FocusState.Programmatic);
+                if (ViewModel.DateConverter.ConvertCommand.CanExecute(null))
+                {
+                    ViewModel.DateConverter.ConvertCommand.Execute(null);
+                }
+            }
+
+            e.Handled = true;
+        }
+
+        private void DateConverterClearButton_Click(object sender, RoutedEventArgs e)
+        {
+            var yearBox = RootGrid?.FindName("DateConverterYearBox") as TextBox;
+            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
+            var dayBox = RootGrid?.FindName("DateConverterDayBox") as TextBox;
+            if (yearBox is null || monthPicker is null || dayBox is null)
+            {
+                return;
+            }
+
+            _suppressDateConverterInputSync = true;
+            yearBox.Text = string.Empty;
+            monthPicker.SelectedIndex = -1;
+            dayBox.Text = string.Empty;
+            _suppressDateConverterInputSync = false;
+
+            ViewModel.DateConverter.InputDate = string.Empty;
+            yearBox.Focus(FocusState.Programmatic);
+        }
+
+        private void SyncDateConverterInputParts()
+        {
+            var yearBox = RootGrid?.FindName("DateConverterYearBox") as TextBox;
+            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
+            var dayBox = RootGrid?.FindName("DateConverterDayBox") as TextBox;
+            if (yearBox is null || monthPicker is null || dayBox is null)
+            {
+                return;
+            }
+
+            var source = ViewModel.DateConverter.InputDate;
+            var year = DateTime.Now.Year;
+            var month = DateTime.Now.Month;
+            var day = DateTime.Now.Day;
+
+            if (!string.IsNullOrWhiteSpace(source))
+            {
+                var parts = source.Split('-', StringSplitOptions.TrimEntries);
+                if (parts.Length == 3
+                    && int.TryParse(parts[0], out var parsedYear)
+                    && int.TryParse(parts[1], out var parsedMonth)
+                    && int.TryParse(parts[2], out var parsedDay)
+                    && parsedYear > 0
+                    && parsedMonth is >= 1 and <= 12
+                    && parsedDay is >= 1 and <= 32)
+                {
+                    year = parsedYear;
+                    month = parsedMonth;
+                    day = parsedDay;
+                }
+            }
+
+            _suppressDateConverterInputSync = true;
+            yearBox.Text = year.ToString("0000");
+            ComboBoxItem? monthSelection = null;
+            foreach (var item in monthPicker.Items)
+            {
+                if (item is ComboBoxItem monthItem
+                    && monthItem.Tag is string monthTag
+                    && int.TryParse(monthTag, out var monthValue)
+                    && monthValue == month)
+                {
+                    monthSelection = monthItem;
+                    break;
+                }
+            }
+
+            monthPicker.SelectedItem = monthSelection;
+            dayBox.Text = day.ToString("00");
+            _suppressDateConverterInputSync = false;
+
+            ViewModel.DateConverter.InputDate = $"{year:0000}-{month:00}-{day:00}";
         }
 
         private void SyncShubhaSaitSelections()
@@ -614,17 +948,6 @@ namespace OpenPatro
                 }
             }
 
-            if (ViewModel.ShubhaSait.SelectedMonth is not null)
-            {
-                foreach (var item in SaitMonthPicker.Items)
-                {
-                    if (item is SaitMonthInfo m && m.MonthKey == ViewModel.ShubhaSait.SelectedMonth)
-                    {
-                        SaitMonthPicker.SelectedItem = item;
-                        break;
-                    }
-                }
-            }
         }
 
         public Visibility BoolToVisibility(bool value) => value ? Visibility.Visible : Visibility.Collapsed;

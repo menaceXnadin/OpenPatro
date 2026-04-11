@@ -14,6 +14,13 @@ namespace OpenPatro.ViewModels;
 
 public sealed class CalendarViewModel : BindableBase
 {
+    public sealed class MonthNavigationOption
+    {
+        public int MonthNumber { get; init; }
+
+        public string DisplayName { get; init; } = string.Empty;
+    }
+
     private readonly AppServices _services;
     private CalendarDayRecord? _todayRecord;
     private CalendarDayCellViewModel? _selectedDay;
@@ -23,6 +30,14 @@ public sealed class CalendarViewModel : BindableBase
     private string _monthTitleEnglish = string.Empty;
     private int _displayYear;
     private int _displayMonth;
+    private int _selectedNavigationYear;
+    private MonthNavigationOption? _selectedNavigationMonth;
+
+    private static readonly string[] NepaliMonthNames =
+    [
+        "बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज",
+        "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"
+    ];
 
     public CalendarViewModel(AppServices services)
     {
@@ -35,6 +50,10 @@ public sealed class CalendarViewModel : BindableBase
     }
 
     public ObservableCollection<CalendarDayCellViewModel> Days { get; } = new();
+
+    public ObservableCollection<int> AvailableYears { get; } = new();
+
+    public ObservableCollection<MonthNavigationOption> AvailableMonths { get; } = new();
 
     public ICommand PreviousMonthCommand { get; }
 
@@ -81,6 +100,50 @@ public sealed class CalendarViewModel : BindableBase
                 ((AsyncRelayCommand)SaveNoteCommand).NotifyCanExecuteChanged();
             }
         }
+    }
+
+    public int SelectedNavigationYear
+    {
+        get => _selectedNavigationYear;
+        private set => SetProperty(ref _selectedNavigationYear, value);
+    }
+
+    public MonthNavigationOption? SelectedNavigationMonth
+    {
+        get => _selectedNavigationMonth;
+        private set => SetProperty(ref _selectedNavigationMonth, value);
+    }
+
+    public async Task NavigateToYearAsync(int year)
+    {
+        if (year == _displayYear)
+        {
+            return;
+        }
+
+        var months = await _services.CalendarRepository.GetAvailableMonthsForYearAsync(year);
+        if (months.Count == 0)
+        {
+            return;
+        }
+
+        var targetMonth = months.Any(m => m.BsMonth == _displayMonth)
+            ? _displayMonth
+            : months[0].BsMonth;
+
+        ClearSelection();
+        await LoadMonthAsync(year, targetMonth);
+    }
+
+    public async Task NavigateToMonthAsync(int month)
+    {
+        if (month == _displayMonth)
+        {
+            return;
+        }
+
+        ClearSelection();
+        await LoadMonthAsync(_displayYear, month);
     }
 
     public bool HasSelectedDay => SelectedDay is not null;
@@ -175,6 +238,7 @@ public sealed class CalendarViewModel : BindableBase
 
             MonthTitleNepali = monthRecord.TitleNepali;
             MonthTitleEnglish = monthRecord.TitleEnglish;
+            await RefreshNavigationOptionsAsync(year, month);
 
             var currentMonthDays = await _services.CalendarRepository.GetMonthDaysAsync(year, month);
             var previousMonthDays = await _services.CalendarRepository.GetMonthDaysAsync(previous.year, previous.month);
@@ -340,5 +404,50 @@ public sealed class CalendarViewModel : BindableBase
         _todayRecord = today;
         RaisePropertyChanged(nameof(TodayBsFullDate));
         RaisePropertyChanged(nameof(TodayAdDateText));
+    }
+
+    private async Task RefreshNavigationOptionsAsync(int year, int month)
+    {
+        var years = await _services.CalendarRepository.GetAvailableBsYearsAsync();
+        AvailableYears.Clear();
+        foreach (var y in years)
+        {
+            AvailableYears.Add(y);
+        }
+
+        if (!AvailableYears.Contains(year))
+        {
+            AvailableYears.Add(year);
+        }
+
+        var monthRecords = await _services.CalendarRepository.GetAvailableMonthsForYearAsync(year);
+        AvailableMonths.Clear();
+
+        if (monthRecords.Count > 0)
+        {
+            foreach (var m in monthRecords)
+            {
+                AvailableMonths.Add(new MonthNavigationOption
+                {
+                    MonthNumber = m.BsMonth,
+                    DisplayName = m.TitleNepali
+                });
+            }
+        }
+        else
+        {
+            for (var i = 1; i <= 12; i++)
+            {
+                AvailableMonths.Add(new MonthNavigationOption
+                {
+                    MonthNumber = i,
+                    DisplayName = NepaliMonthNames[i - 1]
+                });
+            }
+        }
+
+        SelectedNavigationYear = year;
+        SelectedNavigationMonth = AvailableMonths.FirstOrDefault(m => m.MonthNumber == month)
+                                  ?? AvailableMonths.FirstOrDefault();
     }
 }

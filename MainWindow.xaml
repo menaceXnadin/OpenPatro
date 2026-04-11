@@ -49,9 +49,6 @@
                                             </Storyboard>
                                         </VisualState>
                                         <VisualState x:Name="Disabled" />
-                                    </VisualStateGroup>
-                                    <VisualStateGroup x:Name="CheckStates">
-                                        <VisualState x:Name="Unchecked" />
                                         <VisualState x:Name="Checked">
                                             <Storyboard>
                                                 <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ButtonRoot" Storyboard.TargetProperty="Background">
@@ -59,6 +56,29 @@
                                                 </ObjectAnimationUsingKeyFrames>
                                             </Storyboard>
                                         </VisualState>
+                                        <VisualState x:Name="CheckedPointerOver">
+                                            <Storyboard>
+                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ButtonRoot" Storyboard.TargetProperty="Background">
+                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
+                                                </ObjectAnimationUsingKeyFrames>
+                                            </Storyboard>
+                                        </VisualState>
+                                        <VisualState x:Name="CheckedPressed">
+                                            <Storyboard>
+                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ButtonRoot" Storyboard.TargetProperty="Background">
+                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SubtleFillColorTertiaryBrush}" />
+                                                </ObjectAnimationUsingKeyFrames>
+                                            </Storyboard>
+                                        </VisualState>
+                                        <VisualState x:Name="CheckedDisabled">
+                                            <Storyboard>
+                                                <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ButtonRoot" Storyboard.TargetProperty="Background">
+                                                    <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SubtleFillColorSecondaryBrush}" />
+                                                </ObjectAnimationUsingKeyFrames>
+                                            </Storyboard>
+                                        </VisualState>
+                                        <VisualState x:Name="Unchecked" />
+                                        <VisualState x:Name="Indeterminate" />
                                     </VisualStateGroup>
                                 </VisualStateManager.VisualStateGroups>
                                 <ContentPresenter HorizontalAlignment="Center"
@@ -126,30 +146,65 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Grid Margin="0,0,0,24">
+                <!-- ═══ Month header ═══ -->
+                <Grid Margin="0,0,0,20">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
+
+                    <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="{x:Bind ViewModel.Calendar.MonthTitleNepali, Mode=OneWay}"
                                    FontFamily="{StaticResource AppNepaliFontFamily}"
-                                   FontSize="34"
-                                   FontWeight="SemiBold" />
+                                   FontSize="32"
+                                   FontWeight="SemiBold"
+                                   CharacterSpacing="20" />
                         <TextBlock Text="{x:Bind ViewModel.Calendar.MonthTitleEnglish, Mode=OneWay}"
-                                   Opacity="0.68"
-                                   FontSize="14" />
+                                   Opacity="0.52"
+                                   FontSize="13"
+                                   Margin="1,2,0,0"
+                                   CharacterSpacing="40" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="1"
                                 Orientation="Horizontal"
                                 Spacing="8"
-                                VerticalAlignment="Top">
-                        <Button Command="{x:Bind ViewModel.Calendar.PreviousMonthCommand, Mode=OneWay}" MinWidth="40"><FontIcon Glyph="&#xE76B;" /></Button>
-                        <Button Command="{x:Bind ViewModel.Calendar.NextMonthCommand, Mode=OneWay}" MinWidth="40"><FontIcon Glyph="&#xE76C;" /></Button>
+                                VerticalAlignment="Center"
+                                HorizontalAlignment="Center">
+                        <Button Command="{x:Bind ViewModel.Calendar.PreviousMonthCommand, Mode=OneWay}"
+                                Width="36" Height="36" Padding="0"
+                                CornerRadius="18"
+                                Background="Transparent"
+                                BorderThickness="1"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                ToolTipService.ToolTip="Previous month">
+                            <FontIcon Glyph="&#xE100;" FontSize="12" />
+                        </Button>
+                        <ComboBox x:Name="CalendarYearPicker"
+                                  MinWidth="110"
+                                  HorizontalAlignment="Center"
+                                  ItemsSource="{x:Bind ViewModel.Calendar.AvailableYears, Mode=OneWay}"
+                                  SelectionChanged="CalendarYearPicker_SelectionChanged" />
+                        <ComboBox x:Name="CalendarMonthPicker"
+                                  MinWidth="130"
+                                  HorizontalAlignment="Center"
+                                  DisplayMemberPath="DisplayName"
+                                  ItemsSource="{x:Bind ViewModel.Calendar.AvailableMonths, Mode=OneWay}"
+                                  SelectionChanged="CalendarMonthPicker_SelectionChanged" />
+                        <Button Command="{x:Bind ViewModel.Calendar.NextMonthCommand, Mode=OneWay}"
+                                Width="36" Height="36" Padding="0"
+                                CornerRadius="18"
+                                Background="Transparent"
+                                BorderThickness="1"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                ToolTipService.ToolTip="Next month">
+                            <FontIcon Glyph="&#xE101;" FontSize="12" />
+                        </Button>
                     </StackPanel>
                 </Grid>
 
+                <!-- ═══ Calendar body ═══ -->
                 <Grid Grid.Row="1">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -162,37 +217,53 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                            <Grid x:Name="WeekdayHeaderGrid" Margin="0,0,0,16"
-                              Width="{Binding ElementName=CalendarDaysView, Path=ActualWidth}"
-                              HorizontalAlignment="Left">
-                            <Grid.Resources>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="HorizontalAlignment" Value="Center" />
-                                    <Setter Property="TextAlignment" Value="Center" />
-                                </Style>
-                            </Grid.Resources>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="आइतवार" FontFamily="{StaticResource AppNepaliFontFamily}" Opacity="0.56" />
-                            <TextBlock Grid.Column="1" Text="सोमवार" FontFamily="{StaticResource AppNepaliFontFamily}" Opacity="0.56" />
-                            <TextBlock Grid.Column="2" Text="मङ्गलवार" FontFamily="{StaticResource AppNepaliFontFamily}" Opacity="0.56" />
-                            <TextBlock Grid.Column="3" Text="बुधवार" FontFamily="{StaticResource AppNepaliFontFamily}" Opacity="0.56" />
-                            <TextBlock Grid.Column="4" Text="बिहिवार" FontFamily="{StaticResource AppNepaliFontFamily}" Opacity="0.56" />
-                            <TextBlock Grid.Column="5" Text="शुक्रवार" FontFamily="{StaticResource AppNepaliFontFamily}" Opacity="0.56" />
-                            <TextBlock Grid.Column="6" Text="शनिवार" FontFamily="{StaticResource AppNepaliFontFamily}" Opacity="0.38" />
-                        </Grid>
+                        <!-- ─── Weekday header strip ─── -->
+                        <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                CornerRadius="10"
+                                Padding="0,10"
+                                Margin="0,0,0,10"
+                                Width="{Binding ElementName=CalendarDaysView, Path=ActualWidth}"
+                                HorizontalAlignment="Center">
+                            <Grid x:Name="WeekdayHeaderGrid">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="आइत" FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="12" FontWeight="Medium" Opacity="0.62"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="सोम" FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="12" FontWeight="Medium" Opacity="0.62"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="2" Text="मङ्गल" FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="12" FontWeight="Medium" Opacity="0.62"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="3" Text="बुध" FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="12" FontWeight="Medium" Opacity="0.62"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="4" Text="बिहि" FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="12" FontWeight="Medium" Opacity="0.62"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="5" Text="शुक्र" FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="12" FontWeight="Medium" Opacity="0.62"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock Grid.Column="6" Text="शनि" FontFamily="{StaticResource AppNepaliFontFamily}"
+                                           FontSize="12" FontWeight="Medium" Opacity="0.42"
+                                           HorizontalAlignment="Center"
+                                           Foreground="#EF6C6C" />
+                            </Grid>
+                        </Border>
 
+                        <!-- ─── Calendar grid ─── -->
                         <GridView x:Name="CalendarDaysView"
                                   x:FieldModifier="private"
                                   Grid.Row="1"
-                                  HorizontalAlignment="Left"
+                                  HorizontalAlignment="Center"
                                   ItemsSource="{x:Bind ViewModel.Calendar.Days, Mode=OneWay}"
                                   IsItemClickEnabled="True"
                                   ItemClick="CalendarDaysView_ItemClick"
@@ -220,9 +291,9 @@
                                     <Border Background="{Binding BackgroundBrush}"
                                             BorderBrush="{Binding BorderBrush}"
                                             BorderThickness="{Binding BorderThickness}"
-                                            CornerRadius="8"
-                                            Margin="6"
-                                            Padding="12"
+                                            CornerRadius="12"
+                                            Margin="3"
+                                            Padding="10,8,10,8"
                                             Opacity="{Binding CellOpacity}">
                                         <Grid>
                                             <Grid.RowDefinitions>
@@ -231,103 +302,190 @@
                                                 <RowDefinition Height="*" />
                                                 <RowDefinition Height="Auto" />
                                             </Grid.RowDefinitions>
+
+                                            <!-- Day number -->
                                             <TextBlock Text="{Binding Record.BsDayText}"
                                                        FontFamily="{StaticResource AppNepaliFontFamily}"
-                                                       FontSize="22"
+                                                       FontSize="20"
                                                        FontWeight="SemiBold"
                                                        Foreground="{Binding DayForegroundBrush}" />
+
+                                            <!-- Event -->
                                             <TextBlock Grid.Row="1"
                                                        Text="{Binding EventText}"
                                                        FontFamily="{StaticResource AppNepaliFontFamily}"
-                                                       FontSize="12"
-                                                       Margin="0,6,0,0"
+                                                       FontSize="11"
+                                                       Margin="0,4,0,0"
                                                        Foreground="{Binding SecondaryForegroundBrush}"
                                                        TextTrimming="CharacterEllipsis"
-                                                       TextWrapping="WrapWholeWords"
+                                                       TextWrapping="NoWrap"
                                                        MaxLines="1"
                                                        ToolTipService.ToolTip="{Binding EventText}" />
+
+                                            <!-- Tithi -->
                                             <TextBlock Grid.Row="2"
                                                        Text="{Binding Record.Tithi}"
                                                        FontFamily="{StaticResource AppNepaliFontFamily}"
-                                                       FontSize="11"
-                                                       Margin="0,4,0,0"
+                                                       FontSize="10"
+                                                       Margin="0,2,0,0"
                                                        Foreground="{Binding TertiaryForegroundBrush}"
                                                        VerticalAlignment="Bottom"
                                                        TextTrimming="CharacterEllipsis"
                                                        MaxLines="1"
                                                        ToolTipService.ToolTip="{Binding Record.Tithi}" />
+
+                                            <!-- AD day number -->
                                             <TextBlock Grid.Row="3"
                                                        Text="{Binding AdDayText}"
-                                                       FontSize="11"
+                                                       FontSize="10"
                                                        Foreground="{Binding TertiaryForegroundBrush}"
                                                        HorizontalAlignment="Right"
-                                                       VerticalAlignment="Bottom" />
+                                                       VerticalAlignment="Bottom"
+                                                       Opacity="0.8" />
                                         </Grid>
                                     </Border>
                                 </DataTemplate>
                             </GridView.ItemTemplate>
                         </GridView>
 
+                        <!-- ═══ Detail overlay panel ═══ -->
                         <Border x:Name="DetailPanel"
                                 Grid.Row="1"
-                                Width="384"
+                                Width="400"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Top"
                                 Visibility="Collapsed"
                                 Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 BorderThickness="1"
-                                CornerRadius="16"
-                                Padding="24">
+                                CornerRadius="20"
+                                Padding="0">
+                            <Border.Shadow>
+                                <ThemeShadow />
+                            </Border.Shadow>
                             <Border.RenderTransform>
                                 <TranslateTransform x:Name="DetailTransform" X="32" />
                             </Border.RenderTransform>
                             <ScrollViewer VerticalScrollBarVisibility="Auto"
                                           HorizontalScrollBarVisibility="Disabled">
-                                <StackPanel Spacing="12">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedBsFullDate, Mode=OneWay}"
+                                <StackPanel Spacing="0">
+
+                                    <!-- Detail header -->
+                                    <Grid Padding="24,20,24,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedBsFullDate, Mode=OneWay}"
+                                                       FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                       FontSize="24"
+                                                       FontWeight="SemiBold"
+                                                       TextWrapping="Wrap" />
+                                            <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedAdDateText, Mode=OneWay}"
+                                                       Opacity="0.56"
+                                                       FontSize="13" />
+                                        </StackPanel>
+                                        <Button Grid.Column="1"
+                                                Click="CloseDetailPanel_Click"
+                                                Width="32" Height="32" Padding="0"
+                                                CornerRadius="16"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                VerticalAlignment="Top">
+                                            <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                        </Button>
+                                    </Grid>
+
+                                    <!-- Holiday badge -->
+                                    <Border Visibility="{x:Bind ViewModel.Calendar.SelectedHolidayVisibility, Mode=OneWay}"
+                                            Background="#1AEF6C6C"
+                                            CornerRadius="6"
+                                            Padding="10,5"
+                                            Margin="24,0,24,12"
+                                            HorizontalAlignment="Left">
+                                        <TextBlock Text="🔴 बिदा (Holiday)"
                                                    FontFamily="{StaticResource AppNepaliFontFamily}"
-                                                   FontSize="28"
+                                                   FontSize="12"
                                                    FontWeight="SemiBold"
-                                                   TextWrapping="Wrap" />
-                                        <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedAdDateText, Mode=OneWay}"
-                                                   Opacity="0.72" />
+                                                   Foreground="#EF6C6C" />
+                                    </Border>
+
+                                    <!-- Divider -->
+                                    <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="24,0" />
+
+                                    <!-- Info rows -->
+                                    <StackPanel Spacing="14" Padding="24,16,24,16">
+                                        <!-- Lunar / Tithi -->
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="तिथि"
+                                                       FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                       FontSize="11"
+                                                       Opacity="0.44"
+                                                       FontWeight="Medium" />
+                                            <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedLunarText, Mode=OneWay}"
+                                                       FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                       FontSize="15"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+
+                                        <!-- Panchanga -->
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="पञ्चाङ्ग"
+                                                       FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                       FontSize="11"
+                                                       Opacity="0.44"
+                                                       FontWeight="Medium" />
+                                            <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedPanchanga, Mode=OneWay}"
+                                                       FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                       FontSize="14"
+                                                       Opacity="0.82"
+                                                       TextWrapping="Wrap"
+                                                       LineHeight="22" />
+                                        </StackPanel>
+
+                                        <!-- Events -->
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="घटना / पर्व"
+                                                       FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                       FontSize="11"
+                                                       Opacity="0.44"
+                                                       FontWeight="Medium" />
+                                            <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedEventText, Mode=OneWay}"
+                                                       FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                       FontSize="15"
+                                                       TextWrapping="Wrap"
+                                                       LineHeight="24" />
+                                        </StackPanel>
                                     </StackPanel>
-                                    <Button Grid.Column="1" Click="CloseDetailPanel_Click"><FontIcon Glyph="&#xE711;" /></Button>
-                                </Grid>
 
-                                <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedHolidayLabel, Mode=OneWay}"
-                                           Visibility="{x:Bind ViewModel.Calendar.SelectedHolidayVisibility, Mode=OneWay}"
-                                           Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
-                                           FontWeight="SemiBold" />
+                                    <!-- Divider -->
+                                    <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="24,0" />
 
-                                <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedLunarText, Mode=OneWay}"
-                                           FontFamily="{StaticResource AppNepaliFontFamily}"
-                                           FontSize="18" />
-                                <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedPanchanga, Mode=OneWay}"
-                                           FontFamily="{StaticResource AppNepaliFontFamily}"
-                                           Opacity="0.76"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Text="{x:Bind ViewModel.Calendar.SelectedEventText, Mode=OneWay}"
-                                           FontFamily="{StaticResource AppNepaliFontFamily}"
-                                           FontSize="18"
-                                           TextWrapping="Wrap" />
+                                    <!-- Notes section -->
+                                    <StackPanel Spacing="10" Padding="24,16,24,20">
+                                        <TextBlock Text="📝 Personal Note"
+                                                   FontSize="12"
+                                                   Opacity="0.52"
+                                                   FontWeight="Medium" />
+                                        <TextBox Text="{x:Bind ViewModel.Calendar.SelectedNote, Mode=TwoWay}"
+                                                 AcceptsReturn="True"
+                                                 MinHeight="100"
+                                                 CornerRadius="10"
+                                                 TextWrapping="Wrap"
+                                                 PlaceholderText="Add a note for this day…" />
+                                        <Button Command="{x:Bind ViewModel.Calendar.SaveNoteCommand, Mode=OneWay}"
+                                                Style="{ThemeResource AccentButtonStyle}"
+                                                CornerRadius="8"
+                                                HorizontalAlignment="Left"
+                                                Padding="16,6">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE74E;" FontSize="12" />
+                                                <TextBlock Text="Save" FontSize="12" />
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
 
-                                <TextBox Header="Personal note"
-                                         Text="{x:Bind ViewModel.Calendar.SelectedNote, Mode=TwoWay}"
-                                         AcceptsReturn="True"
-                                         MinHeight="120"
-                                         TextWrapping="Wrap" />
-                                <Button Command="{x:Bind ViewModel.Calendar.SaveNoteCommand, Mode=OneWay}"
-                                        HorizontalAlignment="Left">
-                                    Save note
-                                </Button>
                                 </StackPanel>
                             </ScrollViewer>
                         </Border>
@@ -520,7 +678,6 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <ComboBox x:Name="SaitYearPicker"
                                           Header="वर्ष (Year)"
@@ -535,43 +692,47 @@
                                           Margin="16,0,0,0"
                                           HorizontalAlignment="Stretch"
                                           SelectionChanged="SaitCategoryPicker_SelectionChanged" />
-                                <ComboBox x:Name="SaitMonthPicker"
-                                          Grid.Column="2"
-                                          Header="महिना (Month)"
-                                          ItemsSource="{x:Bind ViewModel.ShubhaSait.AvailableMonths, Mode=OneWay}"
-                                          DisplayMemberPath="DisplayName"
-                                          Margin="16,0,0,0"
-                                          HorizontalAlignment="Stretch"
-                                          SelectionChanged="SaitMonthPicker_SelectionChanged" />
                             </Grid>
                         </Border>
                         <Border Padding="24" CornerRadius="16"
                                 Background="{ThemeResource LayerFillColorAltBrush}"
                                 MinHeight="120">
                             <StackPanel Spacing="16">
-                                <TextBlock Text="शुभ दिनहरू (Auspicious Days)"
+                                <TextBlock Text="शुभ दिनहरू (Auspicious Days by Month)"
                                            FontFamily="{StaticResource AppNepaliFontFamily}"
                                            FontSize="18"
                                            FontWeight="SemiBold" />
-                                <GridView ItemsSource="{x:Bind ViewModel.ShubhaSait.AuspiciousDays, Mode=OneWay}"
-                                          SelectionMode="None"
-                                          IsItemClickEnabled="False"
-                                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                                    <GridView.ItemTemplate>
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.ShubhaSait.MonthWiseAuspiciousDays, Mode=OneWay}">
+                                    <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Width="56" Height="56" CornerRadius="28"
-                                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
-                                                    Margin="4">
-                                                <TextBlock Text="{Binding}"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           FontSize="20"
+                                            <StackPanel Spacing="8" Margin="0,0,0,8">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                           FontSize="16"
                                                            FontWeight="SemiBold" />
-                                            </Border>
+                                                <GridView ItemsSource="{Binding Days}"
+                                                          SelectionMode="None"
+                                                          IsItemClickEnabled="False"
+                                                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                                    <GridView.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Width="56" Height="56" CornerRadius="28"
+                                                                    Background="{ThemeResource AccentFillColorDefaultBrush}"
+                                                                    Margin="4">
+                                                                <TextBlock Text="{Binding}"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center"
+                                                                           FontSize="20"
+                                                                           FontWeight="SemiBold" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </GridView.ItemTemplate>
+                                                </GridView>
+                                            </StackPanel>
                                         </DataTemplate>
-                                    </GridView.ItemTemplate>
-                                </GridView>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -618,15 +779,62 @@
                                     <ComboBoxItem Content="BS → AD (बि.सं. → ई.सं.)" Tag="BS" />
                                     <ComboBoxItem Content="AD → BS (ई.सं. → बि.सं.)" Tag="AD" />
                                 </ComboBox>
-                                <TextBox Header="Date (YYYY-MM-DD)"
-                                         PlaceholderText="e.g. 2082-12-28"
-                                         Text="{x:Bind ViewModel.DateConverter.InputDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="DateConverterYearBox"
+                                             Header="Year"
+                                             PlaceholderText="2082"
+                                             InputScope="Number"
+                                             MaxLength="4"
+                                             BeforeTextChanging="DateConverterNumericOnly_BeforeTextChanging"
+                                             TextChanged="DateConverterInputPart_TextChanged"
+                                             KeyDown="DateConverterInputPart_KeyDown" />
+                                    <ComboBox x:Name="DateConverterMonthPicker"
+                                              Grid.Column="1"
+                                              Header="महिना (Month)"
+                                              PlaceholderText="Choose month"
+                                              SelectionChanged="DateConverterMonthPicker_SelectionChanged"
+                                              KeyDown="DateConverterInputPart_KeyDown">
+                                        <ComboBoxItem Content="बैशाख" Tag="1" />
+                                        <ComboBoxItem Content="जेठ" Tag="2" />
+                                        <ComboBoxItem Content="असार" Tag="3" />
+                                        <ComboBoxItem Content="साउन" Tag="4" />
+                                        <ComboBoxItem Content="भदौ" Tag="5" />
+                                        <ComboBoxItem Content="असोज" Tag="6" />
+                                        <ComboBoxItem Content="कात्तिक" Tag="7" />
+                                        <ComboBoxItem Content="मंसिर" Tag="8" />
+                                        <ComboBoxItem Content="पुष" Tag="9" />
+                                        <ComboBoxItem Content="माघ" Tag="10" />
+                                        <ComboBoxItem Content="फाल्गुन" Tag="11" />
+                                        <ComboBoxItem Content="चैत" Tag="12" />
+                                    </ComboBox>
+                                    <TextBox x:Name="DateConverterDayBox"
+                                             Grid.Column="2"
+                                             Header="Day"
+                                             PlaceholderText="28"
+                                             InputScope="Number"
+                                             MaxLength="2"
+                                             BeforeTextChanging="DateConverterNumericOnly_BeforeTextChanging"
+                                             TextChanged="DateConverterInputPart_TextChanged"
+                                             KeyDown="DateConverterInputPart_KeyDown" />
+                                </Grid>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Command="{x:Bind ViewModel.DateConverter.ConvertCommand, Mode=OneWay}"
+                                    <Button x:Name="DateConverterConvertButton"
+                                            Command="{x:Bind ViewModel.DateConverter.ConvertCommand, Mode=OneWay}"
                                             Style="{ThemeResource AccentButtonStyle}">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <FontIcon Glyph="&#xE895;" FontSize="14" />
                                             <TextBlock Text="Convert" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Click="DateConverterClearButton_Click">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <FontIcon Glyph="&#xE894;" FontSize="14" />
+                                            <TextBlock Text="Clear" />
                                         </StackPanel>
                                     </Button>
                                     <Button Command="{x:Bind ViewModel.DateConverter.RefreshCommand, Mode=OneWay}">

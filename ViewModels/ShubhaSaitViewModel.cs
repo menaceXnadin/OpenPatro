@@ -65,6 +65,9 @@ public sealed class ShubhaSaitViewModel : BindableBase
     /// <summary>Auspicious day numbers for the current selection.</summary>
     public ObservableCollection<string> AuspiciousDays { get; } = new();
 
+    /// <summary>Month-wise auspicious day groups for the current year + category.</summary>
+    public ObservableCollection<SaitMonthDaysInfo> MonthWiseAuspiciousDays { get; } = new();
+
     public string? SelectedYear
     {
         get => _selectedYear;
@@ -220,6 +223,7 @@ public sealed class ShubhaSaitViewModel : BindableBase
         AvailableCategories.Clear();
         AvailableMonths.Clear();
         AuspiciousDays.Clear();
+        MonthWiseAuspiciousDays.Clear();
 
         if (_cachedData is null)
         {
@@ -243,6 +247,7 @@ public sealed class ShubhaSaitViewModel : BindableBase
         AvailableCategories.Clear();
         AvailableMonths.Clear();
         AuspiciousDays.Clear();
+        MonthWiseAuspiciousDays.Clear();
 
         if (_cachedData is null || SelectedYear is null || !_cachedData.ContainsKey(SelectedYear))
         {
@@ -265,6 +270,7 @@ public sealed class ShubhaSaitViewModel : BindableBase
 
         AvailableMonths.Clear();
         AuspiciousDays.Clear();
+        MonthWiseAuspiciousDays.Clear();
 
         if (_cachedData is null || SelectedYear is null || SelectedCategoryKey is null)
         {
@@ -281,9 +287,13 @@ public sealed class ShubhaSaitViewModel : BindableBase
         {
             var displayName = BsMonthNames.TryGetValue(monthKey, out var name) ? name : $"Month {monthKey}";
             AvailableMonths.Add(new SaitMonthInfo(monthKey, displayName));
+            if (monthData.TryGetValue(monthKey, out var days))
+            {
+                MonthWiseAuspiciousDays.Add(new SaitMonthDaysInfo(monthKey, displayName, days));
+            }
         }
 
-        // Auto-select the first month
+        // Keep first-month behavior for API/helper compatibility.
         SelectedMonth = AvailableMonths.FirstOrDefault()?.MonthKey;
     }
 
@@ -362,4 +372,18 @@ public sealed class SaitMonthInfo
 
     public string MonthKey { get; }
     public string DisplayName { get; }
+}
+
+public sealed class SaitMonthDaysInfo
+{
+    public SaitMonthDaysInfo(string monthKey, string displayName, IEnumerable<string> days)
+    {
+        MonthKey = monthKey;
+        DisplayName = displayName;
+        Days = new ObservableCollection<string>(days);
+    }
+
+    public string MonthKey { get; }
+    public string DisplayName { get; }
+    public ObservableCollection<string> Days { get; }
 }

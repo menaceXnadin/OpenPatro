@@ -65,6 +65,7 @@ public sealed class MainViewModel : BindableBase
 
     public async Task InitializeAsync()
     {
+        SelectedSection = ShellSection.Calendar;
         await Calendar.InitializeAsync();
         await Settings.InitializeAsync();
 

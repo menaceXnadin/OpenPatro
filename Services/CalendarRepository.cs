@@ -274,6 +274,56 @@ public sealed class CalendarRepository
         return result == 1L;
     }
 
+    public async Task<IReadOnlyList<int>> GetAvailableBsYearsAsync()
+    {
+        var years = new List<int>();
+        await using var connection = new SqliteConnection($"Data Source={_paths.CalendarDatabasePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT DISTINCT BsYear FROM CalendarMonths ORDER BY BsYear;";
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            years.Add(reader.GetInt32(0));
+        }
+
+        return years;
+    }
+
+    public async Task<IReadOnlyList<CalendarMonthRecord>> GetAvailableMonthsForYearAsync(int year)
+    {
+        var months = new List<CalendarMonthRecord>();
+        await using var connection = new SqliteConnection($"Data Source={_paths.CalendarDatabasePath}");
+        await connection.OpenAsync();
+
+        var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT BsYear, BsMonth, TitleNepali, TitleEnglish, FirstAdDateIso, LastAdDateIso
+            FROM CalendarMonths
+            WHERE BsYear = $year
+            ORDER BY BsMonth;
+            """;
+        command.Parameters.AddWithValue("$year", year);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            months.Add(new CalendarMonthRecord
+            {
+                BsYear = reader.GetInt32(0),
+                BsMonth = reader.GetInt32(1),
+                TitleNepali = reader.GetString(2),
+                TitleEnglish = reader.GetString(3),
+                FirstAdDateIso = reader.GetString(4),
+                LastAdDateIso = reader.GetString(5)
+            });
+        }
+
+        return months;
+    }
+
     private static CalendarDayRecord ReadDay(SqliteDataReader reader)
     {
         return new CalendarDayRecord

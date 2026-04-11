@@ -350,6 +350,7 @@ namespace OpenPatro
             _calendarResetInProgress = true;
             try
             {
+                MainViewModel.SelectedSection = ShellSection.Calendar;
                 await MainViewModel.Calendar.InitializeAsync();
             }
             catch (Exception ex)
@@ -805,27 +806,26 @@ namespace OpenPatro
 
             args.Handled = true;
 
-            // IMPORTANT: Do NOT call _mainWindow.Hide() here.
-            // Window.Hide() tells the WinUI runtime this window is gone. Once all
-            // WinUI-tracked windows are hidden, the runtime shuts down the dispatcher
-            // message loop, which kills H.NotifyIcon's ability to deliver click events.
-            //
-            // Instead, MINIMIZE the window and add WS_EX_TOOLWINDOW so it disappears
-            // from the taskbar and Alt+Tab. A minimized window is still considered
-            // "visible" by Windows, which keeps the WinUI dispatcher alive.
             if (_mainWindow is not null)
             {
+                // Preferred tray behavior: hide the window completely.
+                // Keepalive window keeps the dispatcher active in this mode.
+                if (_keepaliveWindow is not null)
+                {
+                    _mainWindow.Hide();
+                    Log("MainWindow: hidden to tray");
+                    return;
+                }
+
+                // Fallback for very early-close race before keepalive is ready.
                 var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_mainWindow);
                 if (hwnd != IntPtr.Zero)
                 {
-                    // Add WS_EX_TOOLWINDOW to hide from taskbar / Alt+Tab.
                     var exStyle = GetWindowLongPtrApp(hwnd, GwlExStyleApp).ToInt64();
                     SetWindowLongPtrApp(hwnd, GwlExStyleApp, new IntPtr(exStyle | WsExToolWindowApp));
                     SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SwpNoSize | SwpNoMove | SwpNoActivate | SwpNoZOrder | SwpFrameChanged);
-
-                    // Minimize — keeps the window "visible" in Win32/WinUI terms.
                     ShowWindow(hwnd, SwMinimize);
-                    Log("MainWindow: minimized + hidden from taskbar");
+                    Log("MainWindow: minimized to tray (keepalive not ready)");
                 }
             }
         }
