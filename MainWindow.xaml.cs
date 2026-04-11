@@ -1,11 +1,13 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Media;
 using OpenPatro.ViewModels;
 using Windows.System;
 
@@ -119,6 +121,7 @@ namespace OpenPatro
             UpdateSectionVisibility();
             UpdateCalendarLayout();
             SyncCalendarNavigationSelections();
+            UpdateDateConverterMonthLabels();
             SyncDateConverterInputParts();
 
             if (AppWindow.Presenter is OverlappedPresenter presenter)
@@ -737,7 +740,73 @@ namespace OpenPatro
                 ViewModel.DateConverter.ConversionDirection = direction;
             }
 
+            UpdateDateConverterMonthLabels();
             SyncDateConverterInputParts();
+        }
+
+        private void UpdateDateConverterMonthLabels()
+        {
+            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
+            if (monthPicker is null)
+            {
+                return;
+            }
+
+            var selectedItem = monthPicker.SelectedItem;
+
+            var monthNames = ViewModel.DateConverter.ConversionDirection == "AD"
+                ? new[] { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" }
+                : new[] { "बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कात्तिक", "मंसिर", "पुष", "माघ", "फाल्गुन", "चैत" };
+
+            foreach (var entry in monthPicker.Items)
+            {
+                if (entry is not ComboBoxItem item
+                    || item.Tag is not string monthTag
+                    || !int.TryParse(monthTag, out var monthNumber)
+                    || monthNumber is < 1 or > 12)
+                {
+                    continue;
+                }
+
+                item.Content = monthNames[monthNumber - 1];
+            }
+
+            if (selectedItem is not null)
+            {
+                _suppressDateConverterInputSync = true;
+                monthPicker.SelectedItem = null;
+                monthPicker.SelectedItem = selectedItem;
+                _suppressDateConverterInputSync = false;
+            }
+        }
+
+        private void RootGrid_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (IsInputElement(e.OriginalSource as DependencyObject))
+            {
+                return;
+            }
+
+            RootGrid.Focus(FocusState.Programmatic);
+        }
+
+        private static bool IsInputElement(DependencyObject? source)
+        {
+            while (source is not null)
+            {
+                if (source is TextBox
+                    || source is ComboBox
+                    || source is PasswordBox
+                    || source is DatePicker
+                    || source is TimePicker)
+                {
+                    return true;
+                }
+
+                source = VisualTreeHelper.GetParent(source);
+            }
+
+            return false;
         }
 
         private void DateConverterInputPart_TextChanged(object sender, TextChangedEventArgs e)
@@ -866,6 +935,53 @@ namespace OpenPatro
 
             ViewModel.DateConverter.InputDate = string.Empty;
             yearBox.Focus(FocusState.Programmatic);
+        }
+
+        private async void GitHubSupportButton_Click(object sender, RoutedEventArgs e)
+        {
+            await OpenSupportLinkAsync("https://github.com/menaceXnadin");
+        }
+
+        private async void LinkedInSupportButton_Click(object sender, RoutedEventArgs e)
+        {
+            await OpenSupportLinkAsync("https://www.linkedin.com/in/nadintamang/");
+        }
+
+        private async void EsewaSupportButton_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new ContentDialog
+            {
+                Title = "eSewa",
+                Content = "Nothing to pay, but your kindness is noted and appreciated.",
+                CloseButtonText = "OK",
+                XamlRoot = RootGrid.XamlRoot
+            };
+
+            await dialog.ShowAsync();
+        }
+
+        private async Task OpenSupportLinkAsync(string link)
+        {
+            if (!Uri.TryCreate(link, UriKind.Absolute, out var uri))
+            {
+                return;
+            }
+
+            var launched = await Launcher.LaunchUriAsync(uri);
+            if (launched)
+            {
+                return;
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = "Unable to open link",
+                Content = link,
+                CloseButtonText = "OK",
+                XamlRoot = RootGrid.XamlRoot
+            };
+
+            await dialog.ShowAsync();
         }
 
         private void SyncDateConverterInputParts()

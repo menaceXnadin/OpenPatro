@@ -11,6 +11,7 @@
 
     <Grid x:Name="RootGrid"
             Loaded="RootGrid_Loaded"
+          PointerPressed="RootGrid_PointerPressed"
           Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
           Padding="20">
         <Grid.Resources>
@@ -179,7 +180,7 @@
                                 BorderThickness="1"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 ToolTipService.ToolTip="Previous month">
-                            <FontIcon Glyph="&#xE100;" FontSize="12" />
+                            <SymbolIcon Symbol="Back" />
                         </Button>
                         <ComboBox x:Name="CalendarYearPicker"
                                   MinWidth="110"
@@ -199,7 +200,7 @@
                                 BorderThickness="1"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 ToolTipService.ToolTip="Next month">
-                            <FontIcon Glyph="&#xE101;" FontSize="12" />
+                            <SymbolIcon Symbol="Forward" />
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -273,11 +274,6 @@
                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                   ScrollViewer.VerticalScrollMode="Disabled">
-                            <GridView.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="7" />
-                                </ItemsPanelTemplate>
-                            </GridView.ItemsPanel>
                             <GridView.ItemContainerStyle>
                                 <Style TargetType="GridViewItem">
                                     <Setter Property="Padding" Value="0" />
@@ -495,26 +491,93 @@
 
             <Grid x:Name="SettingsSection"
                   Visibility="Collapsed">
-                <StackPanel Spacing="16">
-                    <TextBlock Text="Settings" FontSize="30" FontWeight="SemiBold" />
-                    <Border Padding="20" CornerRadius="16" Background="{ThemeResource LayerFillColorAltBrush}">
-                        <StackPanel Spacing="16">
-                            <ToggleSwitch Header="Start with Windows"
-                                          IsOn="{x:Bind ViewModel.Settings.StartWithWindows, Mode=TwoWay}" />
-                            <TextBlock Text="{x:Bind ViewModel.Settings.LastSyncLabel, Mode=OneWay}" Opacity="0.72" />
-                            <Button Command="{x:Bind ViewModel.Settings.RefreshCommand, Mode=OneWay}" HorizontalAlignment="Left">Refresh current data now</Button>
-                        </StackPanel>
-                    </Border>
-                    <Border Padding="20" CornerRadius="16" Background="{ThemeResource LayerFillColorAltBrush}">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="Storage" FontSize="20" FontWeight="SemiBold" />
-                            <TextBlock Text="Calendar database" Opacity="0.56" />
-                            <TextBlock Text="{x:Bind ViewModel.Settings.CalendarDatabasePath, Mode=OneWay}" TextWrapping="Wrap" />
-                            <TextBlock Text="User database" Opacity="0.56" Margin="0,8,0,0" />
-                            <TextBlock Text="{x:Bind ViewModel.Settings.UserDatabasePath, Mode=OneWay}" TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </StackPanel>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="16" Margin="0,0,16,0">
+                        <TextBlock Text="Settings" FontSize="30" FontWeight="SemiBold" />
+                        <Border Padding="20" CornerRadius="16" Background="{ThemeResource LayerFillColorAltBrush}">
+                            <StackPanel Spacing="16">
+                                <ToggleSwitch Header="Start with Windows"
+                                              IsOn="{x:Bind ViewModel.Settings.StartWithWindows, Mode=TwoWay}" />
+                                <TextBlock Text="{x:Bind ViewModel.Settings.LastSyncLabel, Mode=OneWay}" Opacity="0.72" />
+                                <Button Command="{x:Bind ViewModel.Settings.RefreshCommand, Mode=OneWay}" HorizontalAlignment="Left">Refresh current data now</Button>
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="20" CornerRadius="16" Background="{ThemeResource LayerFillColorAltBrush}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Storage" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="Calendar database" Opacity="0.56" />
+                                <TextBlock Text="{x:Bind ViewModel.Settings.CalendarDatabasePath, Mode=OneWay}" TextWrapping="Wrap" />
+                                <TextBlock Text="User database" Opacity="0.56" Margin="0,8,0,0" />
+                                <TextBlock Text="{x:Bind ViewModel.Settings.UserDatabasePath, Mode=OneWay}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                        <Border Padding="20" CornerRadius="16" Background="{ThemeResource LayerFillColorAltBrush}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Connect &amp; Support" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="This app is free and open source. You can connect with the developer or explore the project."
+                                           Opacity="0.72"
+                                           TextWrapping="Wrap" />
+
+                                <Border Padding="12" CornerRadius="12" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                    <Grid ColumnSpacing="12" MinHeight="64">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Width="24" Height="24" VerticalAlignment="Center">
+                                            <SymbolIcon Symbol="Globe" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="GitHub" FontWeight="SemiBold" />
+                                            <TextBlock Text="https://github.com/menaceXnadin" Opacity="0.62" TextWrapping="Wrap" />
+                                            <TextBlock Text="Explore and star the project" Opacity="0.62" FontSize="12" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Click="GitHubSupportButton_Click" VerticalAlignment="Center">Open link</Button>
+                                    </Grid>
+                                </Border>
+
+                                <Border Padding="12" CornerRadius="12" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                    <Grid ColumnSpacing="12" MinHeight="64">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Width="24" Height="24" VerticalAlignment="Center">
+                                            <SymbolIcon Symbol="Contact" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="LinkedIn" FontWeight="SemiBold" />
+                                            <TextBlock Text="https://www.linkedin.com/in/nadintamang/" Opacity="0.62" TextWrapping="Wrap" />
+                                            <TextBlock Text="Professional connection" Opacity="0.62" FontSize="12" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Click="LinkedInSupportButton_Click" VerticalAlignment="Center">Open link</Button>
+                                    </Grid>
+                                </Border>
+
+                                <Border Padding="12" CornerRadius="12" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                    <Grid ColumnSpacing="12" MinHeight="64">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid Width="24" Height="24" VerticalAlignment="Center">
+                                            <SymbolIcon Symbol="Shop" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" Spacing="2">
+                                            <TextBlock Text="eSewa (Support / Easter Egg)" FontWeight="SemiBold" />
+                                            <TextBlock Text="Support the project through eSewa" Opacity="0.62" FontSize="12" />
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Click="EsewaSupportButton_Click" VerticalAlignment="Center">Open</Button>
+                                    </Grid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
             </Grid>
 
             <Grid x:Name="RashifalSection"

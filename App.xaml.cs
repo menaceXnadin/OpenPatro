@@ -379,6 +379,8 @@ namespace OpenPatro
                 }
 
                 _trayIcon.ToolTipText = today.BsFullDate;
+                // Passing null for monthText uses the day-only path, filling the full 256px icon.
+                _trayIcon.Icon = TrayIconGlyphFactory.CreateIcon(today.BsDayText, null, today.IsHoliday);
                 _trayIcon.Icon = TrayIconGlyphFactory.CreateIcon(today.BsDayText, today.IsHoliday);
 
                 if (_todayMenuItem is not null)
@@ -395,6 +397,26 @@ namespace OpenPatro
             {
                 Log($"RefreshTray FAILED: {ex}");
             }
+        }
+
+        private static string GetTrayMonthAbbreviation(int bsMonth)
+        {
+            return bsMonth switch
+            {
+                1 => "बैशाख",
+                2 => "जेठ",
+                3 => "असार",
+                4 => "साउन",
+                5 => "भदौ",
+                6 => "असोज",
+                7 => "कात्तिक",
+                8 => "मंसिर",
+                9 => "पुष",
+                10 => "माघ",
+                11 => "फाल्गुन",
+                12 => "चैत",
+                _ => string.Empty
+            };
         }
 
         public void ExitApplication()
