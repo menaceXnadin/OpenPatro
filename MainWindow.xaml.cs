@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using OpenPatro.Services;
 using OpenPatro.ViewModels;
 using Windows.System;
@@ -120,6 +121,7 @@ namespace OpenPatro
 
             // Cache UI element references once — eliminates repeated FindName() calls.
             CacheUiReferences();
+            ApplySidebarLogo();
 
             ConfigureWindowResizeBehavior();
 
@@ -160,6 +162,46 @@ namespace OpenPatro
 
             AppWindow.Changed -= AppWindow_Changed;
             AppWindow.Changed += AppWindow_Changed;
+        }
+
+        private void SidebarLogo_ImageFailed(object sender, ExceptionRoutedEventArgs e)
+        {
+            ApplySidebarLogo();
+        }
+
+        private void ApplySidebarLogo()
+        {
+            if (SidebarLogo is null)
+            {
+                return;
+            }
+
+            // Resolve the logo from the filesystem using the executable's base directory.
+            // The .csproj CopyToOutputDirectory ensures the asset is present in publish output.
+            var candidates = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "Assets", "Square44x44Logo.scale-200.png"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "Square44x44Logo.scale-200.png"),
+                Path.Combine(Environment.CurrentDirectory, "Assets", "Square44x44Logo.scale-200.png")
+            };
+
+            foreach (var path in candidates)
+            {
+                if (!File.Exists(path))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    SidebarLogo.Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(path));
+                    return;
+                }
+                catch
+                {
+                    // Try the next candidate path.
+                }
+            }
         }
 
         /// <summary>
