@@ -15,7 +15,8 @@ public sealed class AppServices
         StartupService startup,
         TrayNotificationService notifications,
         BundledCalendarSeedService bundledSeed,
-        NepaliPatroApiClient nepaliPatroApi)
+        NepaliPatroApiClient nepaliPatroApi,
+        WindowBoundsService windowBounds)
     {
         Paths = paths;
         Clock = clock;
@@ -27,6 +28,7 @@ public sealed class AppServices
         Notifications = notifications;
         BundledSeed = bundledSeed;
         NepaliPatroApi = nepaliPatroApi;
+        WindowBounds = windowBounds;
     }
 
     public ApplicationPaths Paths { get; }
@@ -49,6 +51,8 @@ public sealed class AppServices
 
     public NepaliPatroApiClient NepaliPatroApi { get; }
 
+    public WindowBoundsService WindowBounds { get; }
+
     public static async Task<AppServices> CreateAsync()
     {
         var paths = ApplicationPaths.Create();
@@ -65,7 +69,8 @@ public sealed class AppServices
         var notifications = new TrayNotificationService(userRepository);
         var bundledSeed = new BundledCalendarSeedService(paths, parser);
         var nepaliPatroApi = new NepaliPatroApiClient();
+        var windowBounds = new WindowBoundsService(userRepository);
 
-        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi);
+        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi, windowBounds);
     }
 }

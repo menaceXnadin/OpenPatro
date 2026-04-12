@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml.Media.Animation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
+using OpenPatro.Services;
 using OpenPatro.ViewModels;
 using Windows.System;
 
@@ -15,20 +16,17 @@ namespace OpenPatro
 {
     public sealed partial class MainWindow : Window
     {
+        // ── Win32 / DWM interop constants ──
         private const int GwlpWndProc = -4;
         private const uint WmGetMinMaxInfo = 0x0024;
-        private const double MinWindowWidthDip = 1160;
-        private const double MinWindowHeightDip = 1050;
-        private const double AbsoluteMinWindowWidthDip = 800;
-        private const double AbsoluteMinWindowHeightDip = 600;
-        private const double MinWindowWidthWorkAreaRatio = 0.72;
-        private const double MinWindowHeightWorkAreaRatio = 0.88;
-        private const int WindowWorkAreaPaddingPx = 24;
         private const int DwmaUseImmersiveDarkModeBefore20H1 = 19;
         private const int DwmaUseImmersiveDarkMode = 20;
 
+        // ── Interop delegates & state ──
         private IntPtr _previousWndProc = IntPtr.Zero;
         private WndProcDelegate? _wndProcDelegate;
+
+        // ── UI state flags ──
         private bool _showDetailPanelForNextSelectionChange;
         private bool _initialWindowSizeApplied;
         private OverlappedPresenterState _lastPresenterState = OverlappedPresenterState.Restored;
@@ -36,6 +34,20 @@ namespace OpenPatro
         private bool _suppressDateConverterInputSync;
         private bool _suppressNavCheckedEvents;
         private bool _suppressCalendarNavigationSelectionEvents;
+
+        // ── Cached UI element references ──
+        // Resolved once during RootGrid_Loaded instead of calling FindName() repeatedly.
+        private GridView? _calendarDaysView;
+        private Grid? _calendarLayoutHost;
+        private Grid? _weekdayHeaderGrid;
+        private Border? _weekdayHeaderBorder;
+        private TextBox? _dateConverterYearBox;
+        private ComboBox? _dateConverterMonthPicker;
+        private TextBox? _dateConverterDayBox;
+        private Button? _dateConverterConvertButton;
+
+        // ── Services ──
+        private ResizePipeline? _resizePipeline;
 
         private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -78,6 +90,12 @@ namespace OpenPatro
             ViewModel.Calendar.PropertyChanged += Calendar_PropertyChanged;
 
             ExtendsContentIntoTitleBar = false;
+
+            // Debounced resize pipeline — all size-change events funnel through here.
+            _resizePipeline = new ResizePipeline(
+                Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread(),
+                OnDebouncedResize);
+
             SizeChanged += MainWindow_SizeChanged;
 
             ApplyWindowIcon();
@@ -94,13 +112,24 @@ namespace OpenPatro
             Activate();
         }
 
-        private void RootGrid_Loaded(object sender, RoutedEventArgs e)
+        // ── Lifecycle ──
+
+        private async void RootGrid_Loaded(object sender, RoutedEventArgs e)
         {
             RootGrid.Loaded -= RootGrid_Loaded;
 
+            // Cache UI element references once — eliminates repeated FindName() calls.
+            CacheUiReferences();
+
             ConfigureWindowResizeBehavior();
-            ApplyInitialWindowSize();
-            CenterWindowOnCurrentDisplay();
+
+            // Attempt to restore saved window bounds; fall back to computed initial size.
+            var restored = await TryRestoreWindowBoundsAsync();
+            if (!restored)
+            {
+                ApplyInitialWindowSize();
+                CenterWindowOnCurrentDisplay();
+            }
 
             CalendarButton.Checked += CalendarButton_Checked;
             CalendarButton.Unchecked += NavButton_Unchecked;
@@ -133,10 +162,39 @@ namespace OpenPatro
             AppWindow.Changed += AppWindow_Changed;
         }
 
+        /// <summary>
+        /// Resolves named elements once and caches them, avoiding repeated FindName() calls.
+        /// </summary>
+        private void CacheUiReferences()
+        {
+            _calendarDaysView = RootGrid?.FindName("CalendarDaysView") as GridView;
+            _calendarLayoutHost = RootGrid?.FindName("CalendarLayoutHost") as Grid;
+            _weekdayHeaderGrid = RootGrid?.FindName("WeekdayHeaderGrid") as Grid;
+            _weekdayHeaderBorder = _weekdayHeaderGrid?.Parent as Border;
+            _dateConverterYearBox = RootGrid?.FindName("DateConverterYearBox") as TextBox;
+            _dateConverterMonthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
+            _dateConverterDayBox = RootGrid?.FindName("DateConverterDayBox") as TextBox;
+            _dateConverterConvertButton = RootGrid?.FindName("DateConverterConvertButton") as Button;
+        }
+
+        // ── Resize pipeline ──
+
         private void MainWindow_SizeChanged(object sender, WindowSizeChangedEventArgs args)
         {
-            UpdateCalendarLayout();
+            // Funnel all resize events through the debounced pipeline.
+            _resizePipeline?.RequestLayout();
         }
+
+        /// <summary>
+        /// Single authoritative callback that runs after resize events have settled.
+        /// </summary>
+        private void OnDebouncedResize()
+        {
+            UpdateCalendarLayout();
+            _ = PersistWindowBoundsAsync();
+        }
+
+        // ── Navigation ──
 
         private void CalendarButton_Checked(object sender, RoutedEventArgs e)
         {
@@ -223,6 +281,8 @@ namespace OpenPatro
             }
         }
 
+        // ── Section visibility ──
+
         private void UpdateSectionVisibility()
         {
             if (CalendarSection is null || SettingsSection is null)
@@ -256,69 +316,48 @@ namespace OpenPatro
             _suppressNavCheckedEvents = false;
         }
 
+        // ── Calendar layout (uses WindowLayoutService) ──
+
         private void UpdateCalendarLayout()
         {
-            var calendarDaysView = RootGrid?.FindName("CalendarDaysView") as GridView;
-            var layoutHost = RootGrid?.FindName("CalendarLayoutHost") as Grid;
-            var weekdayHeader = RootGrid?.FindName("WeekdayHeaderGrid") as Grid;
-
-            if (calendarDaysView?.ItemsPanelRoot is not ItemsWrapGrid panel || layoutHost is null || weekdayHeader is null)
+            if (_calendarDaysView?.ItemsPanelRoot is not ItemsWrapGrid panel
+                || _calendarLayoutHost is null
+                || _weekdayHeaderGrid is null)
             {
                 return;
             }
 
-            var availableWidth = layoutHost.ActualWidth;
-            if (availableWidth <= 0)
+            var headerHeight = _weekdayHeaderBorder?.ActualHeight
+                               ?? _weekdayHeaderGrid.ActualHeight;
+
+            var metrics = WindowLayoutService.ComputeCalendarGridMetrics(
+                _calendarLayoutHost.ActualWidth, _calendarLayoutHost.ActualHeight, headerHeight);
+
+            if (metrics is null)
             {
                 return;
             }
 
-            const int columns = 7;
-            const int rows = 6;
-            const double minCellSize = 72;
-            const double maxCellSize = 260;
-            const double cellAspectRatio = 0.92; // height = width * ratio
+            _calendarDaysView.Width = metrics.GridWidth;
+            _calendarDaysView.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
 
-            // The weekday header strip Border wraps the inner grid.
-            var weekdayHeaderParent = weekdayHeader.Parent as Microsoft.UI.Xaml.Controls.Border;
-            var headerHeight = weekdayHeaderParent?.ActualHeight ?? weekdayHeader.ActualHeight;
-            // 10 = margin below the weekday header border
-            var availableHeight = Math.Max(0, layoutHost.ActualHeight - headerHeight - 10);
-
-            // Compute the cell width that would fill width vs. height independently.
-            var widthFromAvailableWidth = Math.Floor(availableWidth / columns);
-            var widthFromAvailableHeight = Math.Floor(availableHeight / rows / cellAspectRatio);
-
-            // Use the smaller so the 7×6 grid fits in BOTH dimensions.
-            var itemWidth = Math.Min(widthFromAvailableWidth, widthFromAvailableHeight);
-            itemWidth = Math.Clamp(itemWidth, minCellSize, maxCellSize);
-
-            var itemHeight = Math.Floor(itemWidth * cellAspectRatio);
-            itemHeight = Math.Clamp(itemHeight, minCellSize * cellAspectRatio, maxCellSize * cellAspectRatio);
-
-            // Small buffer (+4px) accounts for the GridView's internal ScrollViewer/Border
-            // overhead that would otherwise eat into the exact 7*itemWidth, causing
-            // the ItemsWrapGrid to wrap at 6 columns instead of 7.
-            var gridWidth = (itemWidth * columns) + 4;
-            calendarDaysView.Width = gridWidth;
-
-            // Always center the grid so there is no dead space on the right.
-            if (weekdayHeaderParent is not null)
+            // Keep the weekday header strip aligned with the calendar grid.
+            if (_weekdayHeaderBorder is not null)
             {
-                weekdayHeaderParent.Width = gridWidth;
-                weekdayHeaderParent.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
+                _weekdayHeaderBorder.Width = metrics.GridWidth;
+                _weekdayHeaderBorder.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
             }
             else
             {
-                weekdayHeader.Width = gridWidth;
-                weekdayHeader.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
+                _weekdayHeaderGrid.Width = metrics.GridWidth;
+                _weekdayHeaderGrid.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
             }
 
-            calendarDaysView.HorizontalAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Center;
-
-            panel.ItemWidth = itemWidth;
-            panel.ItemHeight = itemHeight;
+            panel.ItemWidth = metrics.ItemWidth;
+            panel.ItemHeight = metrics.ItemHeight;
         }
+
+        // ── Window positioning & bounds ──
 
         private void CenterWindowOnCurrentDisplay()
         {
@@ -338,6 +377,90 @@ namespace OpenPatro
                 // Best-effort centering only.
             }
         }
+
+        /// <summary>
+        /// Attempts to restore window bounds and presenter state from the user's saved settings.
+        /// Returns true if bounds were successfully restored, false otherwise.
+        /// </summary>
+        private async Task<bool> TryRestoreWindowBoundsAsync()
+        {
+            try
+            {
+                var services = ((App)Application.Current).Services;
+                var saved = await services.WindowBounds.LoadAsync();
+
+                if (saved is null)
+                {
+                    return false;
+                }
+
+                // Validate that the saved bounds are on a visible display area.
+                var displayArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
+                var workArea = displayArea.WorkArea;
+
+                // Ensure the window is at least partially visible on the current monitor.
+                var onScreenX = Math.Max(workArea.X, Math.Min(saved.X, workArea.X + workArea.Width - 100));
+                var onScreenY = Math.Max(workArea.Y, Math.Min(saved.Y, workArea.Y + workArea.Height - 100));
+
+                // Clamp dimensions to the current work area.
+                var width = Math.Clamp(saved.Width, (int)WindowLayoutService.AbsoluteMinWidthDip, workArea.Width);
+                var height = Math.Clamp(saved.Height, (int)WindowLayoutService.AbsoluteMinHeightDip, workArea.Height);
+
+                AppWindow.Resize(new Windows.Graphics.SizeInt32(width, height));
+                AppWindow.Move(new Windows.Graphics.PointInt32(onScreenX, onScreenY));
+
+                if (saved.IsMaximized && AppWindow.Presenter is OverlappedPresenter presenter)
+                {
+                    presenter.Maximize();
+                }
+
+                _initialWindowSizeApplied = true;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Persists current window position, size, and state to the settings store.
+        /// Called by the debounced resize pipeline so we don't write on every pixel drag.
+        /// </summary>
+        private async Task PersistWindowBoundsAsync()
+        {
+            try
+            {
+                var services = ((App)Application.Current).Services;
+                var isMaximized = AppWindow.Presenter is OverlappedPresenter p
+                                  && p.State == OverlappedPresenterState.Maximized;
+
+                // When maximized, save the restored (pre-maximize) size from the last known
+                // good position so restore works correctly next launch.
+                if (!isMaximized)
+                {
+                    var pos = AppWindow.Position;
+                    var size = AppWindow.Size;
+                    await services.WindowBounds.SaveAsync(pos.X, pos.Y, size.Width, size.Height, false);
+                }
+                else
+                {
+                    // Save state as maximized; keep the last-saved position/size.
+                    var existing = await services.WindowBounds.LoadAsync();
+                    if (existing is not null)
+                    {
+                        await services.WindowBounds.SaveAsync(
+                            existing.X, existing.Y, existing.Width, existing.Height, true);
+                    }
+                }
+            }
+            catch
+            {
+                // Best-effort persistence.
+            }
+        }
+
+        // ── Calendar property changes ──
 
         private void Calendar_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
@@ -418,6 +541,8 @@ namespace OpenPatro
             _suppressCalendarNavigationSelectionEvents = false;
         }
 
+        // ── Detail panel animations ──
+
         private void ShowDetailPanel()
         {
             DetailPanel.Visibility = Visibility.Visible;
@@ -482,6 +607,8 @@ namespace OpenPatro
             animation.Begin();
         }
 
+        // ── Window chrome helpers ──
+
         private void ApplyWindowIcon()
         {
             var iconCandidates = new[]
@@ -532,6 +659,8 @@ namespace OpenPatro
             _ = DwmSetWindowAttribute(hwnd, DwmaUseImmersiveDarkModeBefore20H1, ref useDarkMode, sizeof(int));
         }
 
+        // ── Minimum window size via WndProc hook ──
+
         private void ConfigureMinimumWindowSize()
         {
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -545,66 +674,12 @@ namespace OpenPatro
             _previousWndProc = SetWindowLongPtr(hwnd, GwlpWndProc, newWndProc);
         }
 
-        private static uint GetWindowDpiOrDefault(IntPtr hwnd)
-        {
-            var dpi = GetDpiForWindow(hwnd);
-            return dpi == 0 ? 96u : dpi;
-        }
-
-        private static int DipToPx(double dip, uint dpi)
-        {
-            return (int)Math.Ceiling(dip * dpi / 96.0);
-        }
-
-        private (int minWidthPx, int minHeightPx) GetMinimumWindowSizePx(IntPtr hwnd)
-        {
-            var dpi = GetWindowDpiOrDefault(hwnd);
-            return (DipToPx(AbsoluteMinWindowWidthDip, dpi), DipToPx(AbsoluteMinWindowHeightDip, dpi));
-        }
-
-        private (int WidthPx, int HeightPx) GetTargetWindowSizePx(IntPtr hwnd)
-        {
-            var dpi = GetWindowDpiOrDefault(hwnd);
-
-            var preferredWidthPx = DipToPx(MinWindowWidthDip, dpi);
-            var preferredHeightPx = DipToPx(MinWindowHeightDip, dpi);
-
-            var (absoluteMinWidthPx, absoluteMinHeightPx) = GetMinimumWindowSizePx(hwnd);
-
-            var maxWidthPx = int.MaxValue;
-            var maxHeightPx = int.MaxValue;
-            var targetWidthPx = preferredWidthPx;
-            var targetHeightPx = preferredHeightPx;
-
-            try
-            {
-                var displayArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
-                var workArea = displayArea.WorkArea;
-                maxWidthPx = Math.Max(480, workArea.Width - WindowWorkAreaPaddingPx);
-                maxHeightPx = Math.Max(480, workArea.Height - WindowWorkAreaPaddingPx);
-
-                targetWidthPx = (int)Math.Floor(maxWidthPx * MinWindowWidthWorkAreaRatio);
-                targetHeightPx = (int)Math.Floor(maxHeightPx * MinWindowHeightWorkAreaRatio);
-            }
-            catch
-            {
-                // Fall back to DPI-scaled preferred sizing when monitor work area can't be read.
-            }
-
-            var effectiveMinWidthPx = Math.Min(absoluteMinWidthPx, maxWidthPx);
-            var effectiveMinHeightPx = Math.Min(absoluteMinHeightPx, maxHeightPx);
-
-            var widthPx = Math.Clamp(targetWidthPx, effectiveMinWidthPx, maxWidthPx);
-            var heightPx = Math.Clamp(targetHeightPx, effectiveMinHeightPx, maxHeightPx);
-
-            return (widthPx, heightPx);
-        }
-
         private IntPtr WindowProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         {
             if (msg == WmGetMinMaxInfo)
             {
-                var (minWidthPx, minHeightPx) = GetMinimumWindowSizePx(hWnd);
+                var dpi = WindowLayoutService.SafeDpi(GetDpiForWindow(hWnd));
+                var (minWidthPx, minHeightPx) = WindowLayoutService.GetMinimumSizePx(dpi);
 
                 var minMaxInfo = Marshal.PtrToStructure<MinMaxInfo>(lParam);
                 minMaxInfo.ptMinTrackSize.X = Math.Max(minMaxInfo.ptMinTrackSize.X, minWidthPx);
@@ -621,6 +696,8 @@ namespace OpenPatro
 
             return DefWindowProc(hWnd, msg, wParam, lParam);
         }
+
+        // ── Window resize behavior ──
 
         private void ConfigureWindowResizeBehavior()
         {
@@ -647,6 +724,12 @@ namespace OpenPatro
                 _ = TryResizeToInitialWindowSize();
             }
 
+            // Persist state on maximize/minimize transitions too.
+            if (_lastPresenterState != currentState)
+            {
+                _resizePipeline?.RequestLayout();
+            }
+
             _lastPresenterState = currentState;
         }
 
@@ -671,7 +754,8 @@ namespace OpenPatro
                 return false;
             }
 
-            var (widthPx, heightPx) = GetTargetWindowSizePx(hwnd);
+            var dpi = WindowLayoutService.SafeDpi(GetDpiForWindow(hwnd));
+            var (widthPx, heightPx) = WindowLayoutService.GetTargetSizePx(dpi, AppWindow);
 
             try
             {
@@ -684,6 +768,8 @@ namespace OpenPatro
                 return false;
             }
         }
+
+        // ── Rashifal picker handlers ──
 
         private void RashifalTypePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -700,6 +786,8 @@ namespace OpenPatro
                 ViewModel.Rashifal.SelectedZodiacKey = key;
             }
         }
+
+        // ── Shubha Sait picker handlers ──
 
         private void SaitYearPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -733,6 +821,8 @@ namespace OpenPatro
             _suppressSaitSelectionEvents = false;
         }
 
+        // ── Date Converter handlers (using cached references) ──
+
         private void DateConverterDirection_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (((ComboBox)sender).SelectedItem is ComboBoxItem item && item.Tag is string direction)
@@ -746,36 +836,35 @@ namespace OpenPatro
 
         private void UpdateDateConverterMonthLabels()
         {
-            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
-            if (monthPicker is null)
+            if (_dateConverterMonthPicker is null)
             {
                 return;
             }
 
-            var selectedItem = monthPicker.SelectedItem;
+            var selectedItem = _dateConverterMonthPicker.SelectedItem;
 
             var monthNames = ViewModel.DateConverter.ConversionDirection == "AD"
                 ? new[] { "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December" }
                 : new[] { "बैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कात्तिक", "मंसिर", "पुष", "माघ", "फाल्गुन", "चैत" };
 
-            foreach (var entry in monthPicker.Items)
+            foreach (var entry in _dateConverterMonthPicker.Items)
             {
-                if (entry is not ComboBoxItem item
-                    || item.Tag is not string monthTag
+                if (entry is not ComboBoxItem monthItem
+                    || monthItem.Tag is not string monthTag
                     || !int.TryParse(monthTag, out var monthNumber)
                     || monthNumber is < 1 or > 12)
                 {
                     continue;
                 }
 
-                item.Content = monthNames[monthNumber - 1];
+                monthItem.Content = monthNames[monthNumber - 1];
             }
 
             if (selectedItem is not null)
             {
                 _suppressDateConverterInputSync = true;
-                monthPicker.SelectedItem = null;
-                monthPicker.SelectedItem = selectedItem;
+                _dateConverterMonthPicker.SelectedItem = null;
+                _dateConverterMonthPicker.SelectedItem = selectedItem;
                 _suppressDateConverterInputSync = false;
             }
         }
@@ -848,18 +937,15 @@ namespace OpenPatro
 
         private void UpdateDateConverterInputDateFromControls()
         {
-            var yearBox = RootGrid?.FindName("DateConverterYearBox") as TextBox;
-            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
-            var dayBox = RootGrid?.FindName("DateConverterDayBox") as TextBox;
-            if (yearBox is null || monthPicker is null || dayBox is null)
+            if (_dateConverterYearBox is null || _dateConverterMonthPicker is null || _dateConverterDayBox is null)
             {
                 return;
             }
 
-            var yearText = yearBox.Text.Trim();
-            var dayText = dayBox.Text.Trim();
+            var yearText = _dateConverterYearBox.Text.Trim();
+            var dayText = _dateConverterDayBox.Text.Trim();
             var month = 0;
-            if (monthPicker.SelectedItem is ComboBoxItem monthItem
+            if (_dateConverterMonthPicker.SelectedItem is ComboBoxItem monthItem
                 && monthItem.Tag is string monthTag
                 && int.TryParse(monthTag, out var parsedMonth))
             {
@@ -892,22 +978,17 @@ namespace OpenPatro
                 return;
             }
 
-            var yearBox = RootGrid?.FindName("DateConverterYearBox") as TextBox;
-            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
-            var dayBox = RootGrid?.FindName("DateConverterDayBox") as TextBox;
-            var convertButton = RootGrid?.FindName("DateConverterConvertButton") as Button;
-
-            if (ReferenceEquals(sender, yearBox))
+            if (ReferenceEquals(sender, _dateConverterYearBox))
             {
-                monthPicker?.Focus(FocusState.Programmatic);
+                _dateConverterMonthPicker?.Focus(FocusState.Programmatic);
             }
-            else if (ReferenceEquals(sender, monthPicker))
+            else if (ReferenceEquals(sender, _dateConverterMonthPicker))
             {
-                dayBox?.Focus(FocusState.Programmatic);
+                _dateConverterDayBox?.Focus(FocusState.Programmatic);
             }
-            else if (ReferenceEquals(sender, dayBox))
+            else if (ReferenceEquals(sender, _dateConverterDayBox))
             {
-                convertButton?.Focus(FocusState.Programmatic);
+                _dateConverterConvertButton?.Focus(FocusState.Programmatic);
                 if (ViewModel.DateConverter.ConvertCommand.CanExecute(null))
                 {
                     ViewModel.DateConverter.ConvertCommand.Execute(null);
@@ -919,23 +1000,22 @@ namespace OpenPatro
 
         private void DateConverterClearButton_Click(object sender, RoutedEventArgs e)
         {
-            var yearBox = RootGrid?.FindName("DateConverterYearBox") as TextBox;
-            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
-            var dayBox = RootGrid?.FindName("DateConverterDayBox") as TextBox;
-            if (yearBox is null || monthPicker is null || dayBox is null)
+            if (_dateConverterYearBox is null || _dateConverterMonthPicker is null || _dateConverterDayBox is null)
             {
                 return;
             }
 
             _suppressDateConverterInputSync = true;
-            yearBox.Text = string.Empty;
-            monthPicker.SelectedIndex = -1;
-            dayBox.Text = string.Empty;
+            _dateConverterYearBox.Text = string.Empty;
+            _dateConverterMonthPicker.SelectedIndex = -1;
+            _dateConverterDayBox.Text = string.Empty;
             _suppressDateConverterInputSync = false;
 
             ViewModel.DateConverter.InputDate = string.Empty;
-            yearBox.Focus(FocusState.Programmatic);
+            _dateConverterYearBox.Focus(FocusState.Programmatic);
         }
+
+        // ── Support links ──
 
         private async void GitHubSupportButton_Click(object sender, RoutedEventArgs e)
         {
@@ -984,12 +1064,11 @@ namespace OpenPatro
             await dialog.ShowAsync();
         }
 
+        // ── Sync helpers (using cached references) ──
+
         private void SyncDateConverterInputParts()
         {
-            var yearBox = RootGrid?.FindName("DateConverterYearBox") as TextBox;
-            var monthPicker = RootGrid?.FindName("DateConverterMonthPicker") as ComboBox;
-            var dayBox = RootGrid?.FindName("DateConverterDayBox") as TextBox;
-            if (yearBox is null || monthPicker is null || dayBox is null)
+            if (_dateConverterYearBox is null || _dateConverterMonthPicker is null || _dateConverterDayBox is null)
             {
                 return;
             }
@@ -1017,9 +1096,9 @@ namespace OpenPatro
             }
 
             _suppressDateConverterInputSync = true;
-            yearBox.Text = year.ToString("0000");
+            _dateConverterYearBox.Text = year.ToString("0000");
             ComboBoxItem? monthSelection = null;
-            foreach (var item in monthPicker.Items)
+            foreach (var item in _dateConverterMonthPicker.Items)
             {
                 if (item is ComboBoxItem monthItem
                     && monthItem.Tag is string monthTag
@@ -1031,8 +1110,8 @@ namespace OpenPatro
                 }
             }
 
-            monthPicker.SelectedItem = monthSelection;
-            dayBox.Text = day.ToString("00");
+            _dateConverterMonthPicker.SelectedItem = monthSelection;
+            _dateConverterDayBox.Text = day.ToString("00");
             _suppressDateConverterInputSync = false;
 
             ViewModel.DateConverter.InputDate = $"{year:0000}-{month:00}-{day:00}";
