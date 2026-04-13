@@ -135,6 +135,8 @@ namespace OpenPatro
 
             CalendarButton.Checked += CalendarButton_Checked;
             CalendarButton.Unchecked += NavButton_Unchecked;
+            StockMarketButton.Checked += StockMarketButton_Checked;
+            StockMarketButton.Unchecked += NavButton_Unchecked;
             SettingsButton.Checked += SettingsButton_Checked;
             SettingsButton.Unchecked += NavButton_Unchecked;
             RashifalButton.Checked += RashifalButton_Checked;
@@ -145,6 +147,7 @@ namespace OpenPatro
             DateConverterButton.Unchecked += NavButton_Unchecked;
 
             CalendarButton.IsChecked = ViewModel.SelectedSection == ShellSection.Calendar;
+            StockMarketButton.IsChecked = ViewModel.SelectedSection == ShellSection.StockMarket;
             SettingsButton.IsChecked = ViewModel.SelectedSection == ShellSection.Settings;
             RashifalButton.IsChecked = ViewModel.SelectedSection == ShellSection.Rashifal;
             ShubhaSaitButton.IsChecked = ViewModel.SelectedSection == ShellSection.ShubhaSait;
@@ -252,6 +255,14 @@ namespace OpenPatro
             UpdateSectionVisibility();
         }
 
+        private async void StockMarketButton_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressNavCheckedEvents) return;
+            ViewModel.SelectedSection = ShellSection.StockMarket;
+            UpdateSectionVisibility();
+            await ViewModel.StockMarket.InitializeAsync();
+        }
+
         private async void RashifalButton_Checked(object sender, RoutedEventArgs e)
         {
             if (_suppressNavCheckedEvents) return;
@@ -277,6 +288,33 @@ namespace OpenPatro
             ViewModel.SelectedSection = ShellSection.DateConverter;
             UpdateSectionVisibility();
             SyncDateConverterInputParts();
+        }
+
+        // ── Top Stocks Tab Handlers ──
+
+        private void TopGainersTab_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.StockMarket.SelectedTopStocksTab = "TopGainers";
+        }
+
+        private void TopLosersTab_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.StockMarket.SelectedTopStocksTab = "TopLosers";
+        }
+
+        private void TopTurnoverTab_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.StockMarket.SelectedTopStocksTab = "TopTurnover";
+        }
+
+        private void TopVolumeTab_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.StockMarket.SelectedTopStocksTab = "TopVolume";
+        }
+
+        private void TopTransactionsTab_Click(object sender, RoutedEventArgs e)
+        {
+            ViewModel.StockMarket.SelectedTopStocksTab = "TopTransactions";
         }
 
         // Prevent the user from unchecking the currently active nav button
@@ -334,12 +372,14 @@ namespace OpenPatro
 
             CalendarSection.Visibility = ViewModel.IsCalendarVisible ? Visibility.Visible : Visibility.Collapsed;
             SettingsSection.Visibility = ViewModel.IsSettingsVisible ? Visibility.Visible : Visibility.Collapsed;
+            StockMarketSection.Visibility = ViewModel.IsStockMarketVisible ? Visibility.Visible : Visibility.Collapsed;
             RashifalSection.Visibility = ViewModel.IsRashifalVisible ? Visibility.Visible : Visibility.Collapsed;
             ShubhaSaitSection.Visibility = ViewModel.IsShubhaSaitVisible ? Visibility.Visible : Visibility.Collapsed;
             DateConverterSection.Visibility = ViewModel.IsDateConverterVisible ? Visibility.Visible : Visibility.Collapsed;
 
             var activeButton = ViewModel.SelectedSection switch
             {
+                ShellSection.StockMarket => StockMarketButton,
                 ShellSection.Settings => SettingsButton,
                 ShellSection.Rashifal => RashifalButton,
                 ShellSection.ShubhaSait => ShubhaSaitButton,
@@ -351,6 +391,7 @@ namespace OpenPatro
             // IsChecked programmatically below.
             _suppressNavCheckedEvents = true;
             CalendarButton.IsChecked = ReferenceEquals(activeButton, CalendarButton);
+            StockMarketButton.IsChecked = ReferenceEquals(activeButton, StockMarketButton);
             RashifalButton.IsChecked = ReferenceEquals(activeButton, RashifalButton);
             ShubhaSaitButton.IsChecked = ReferenceEquals(activeButton, ShubhaSaitButton);
             DateConverterButton.IsChecked = ReferenceEquals(activeButton, DateConverterButton);

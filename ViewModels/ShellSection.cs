@@ -4,6 +4,7 @@ public enum ShellSection
 {
     Calendar,
     Search,
+    StockMarket,
     Settings,
     Rashifal,
     ShubhaSait,

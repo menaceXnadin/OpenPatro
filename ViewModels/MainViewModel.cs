@@ -11,6 +11,7 @@ public sealed class MainViewModel : BindableBase
     {
         Calendar = new CalendarViewModel(services);
         Search = new SearchViewModel(services);
+        StockMarket = new StockMarketViewModel(services);
         Settings = new SettingsViewModel(services);
         Rashifal = new RashifalViewModel(services);
         ShubhaSait = new ShubhaSaitViewModel(services);
@@ -20,6 +21,8 @@ public sealed class MainViewModel : BindableBase
     public CalendarViewModel Calendar { get; }
 
     public SearchViewModel Search { get; }
+
+    public StockMarketViewModel StockMarket { get; }
 
     public SettingsViewModel Settings { get; }
 
@@ -43,6 +46,7 @@ public sealed class MainViewModel : BindableBase
             {
                 RaisePropertyChanged(nameof(IsCalendarVisible));
                 RaisePropertyChanged(nameof(IsSearchVisible));
+                RaisePropertyChanged(nameof(IsStockMarketVisible));
                 RaisePropertyChanged(nameof(IsSettingsVisible));
                 RaisePropertyChanged(nameof(IsRashifalVisible));
                 RaisePropertyChanged(nameof(IsShubhaSaitVisible));
@@ -54,6 +58,8 @@ public sealed class MainViewModel : BindableBase
     public bool IsCalendarVisible => SelectedSection == ShellSection.Calendar;
 
     public bool IsSearchVisible => false;
+
+    public bool IsStockMarketVisible => SelectedSection == ShellSection.StockMarket;
 
     public bool IsSettingsVisible => SelectedSection == ShellSection.Settings;
 
@@ -74,6 +80,7 @@ public sealed class MainViewModel : BindableBase
         // so ObservableCollection mutations are safe for WinUI data bindings.
         _ = SafeInitializeAsync(Rashifal);
         _ = SafeInitializeAsync(ShubhaSait);
+        _ = SafeInitializeAsync(StockMarket);
     }
 
     public async Task SelectCalendarDateAsync(int year, int month, int day)
@@ -88,6 +95,11 @@ public sealed class MainViewModel : BindableBase
     }
 
     private static async Task SafeInitializeAsync(ShubhaSaitViewModel vm)
+    {
+        try { await vm.InitializeAsync(); } catch { /* Network failure during pre-fetch is OK */ }
+    }
+
+    private static async Task SafeInitializeAsync(StockMarketViewModel vm)
     {
         try { await vm.InitializeAsync(); } catch { /* Network failure during pre-fetch is OK */ }
     }

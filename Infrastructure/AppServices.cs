@@ -11,6 +11,7 @@ public sealed class AppServices
         CalendarRepository calendarRepository,
         UserRepository userRepository,
         HamroPatroClient hamroPatro,
+        ShareHubNepseClient shareHubNepse,
         CalendarSyncService calendarSync,
         StartupService startup,
         TrayNotificationService notifications,
@@ -23,6 +24,7 @@ public sealed class AppServices
         CalendarRepository = calendarRepository;
         UserRepository = userRepository;
         HamroPatro = hamroPatro;
+        ShareHubNepse = shareHubNepse;
         CalendarSync = calendarSync;
         Startup = startup;
         Notifications = notifications;
@@ -40,6 +42,8 @@ public sealed class AppServices
     public UserRepository UserRepository { get; }
 
     public HamroPatroClient HamroPatro { get; }
+
+    public ShareHubNepseClient ShareHubNepse { get; }
 
     public CalendarSyncService CalendarSync { get; }
 
@@ -64,6 +68,7 @@ public sealed class AppServices
         var userRepository = new UserRepository(paths);
         var parser = new HamroPatroParser();
         var hamroPatro = new HamroPatroClient(parser);
+        var shareHubNepse = new ShareHubNepseClient();
         var calendarSync = new CalendarSyncService(clock, calendarRepository, hamroPatro, userRepository);
         var startup = new StartupService();
         var notifications = new TrayNotificationService(userRepository);
@@ -71,6 +76,6 @@ public sealed class AppServices
         var nepaliPatroApi = new NepaliPatroApiClient();
         var windowBounds = new WindowBoundsService(userRepository);
 
-        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi, windowBounds);
+        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, shareHubNepse, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi, windowBounds);
     }
 }
