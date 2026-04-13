@@ -626,259 +626,316 @@
                                    Visibility="{x:Bind StringToVisibility(ViewModel.StockMarket.ErrorMessage), Mode=OneWay}"
                                    Foreground="#EF4444" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,20,0,20" />
 
-                        <!-- ROW 2: Market Summary - 6 Cards -->
+                        <!-- ROW 2: Main Indices - 4 Cards in Grid -->
                         <Grid ColumnSpacing="14">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             
-                            <Border Padding="20,18" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <!-- NEPSE -->
+                            <Border Grid.Column="0" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="Turnover" Opacity="0.65" FontSize="13" />
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.TotalTurnover, Mode=OneWay}" FontSize="26" FontWeight="Bold" />
+                                    <TextBlock Text="NEPSE" Opacity="0.6" FontSize="13" />
+                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.NepseValue, Mode=OneWay}" FontSize="32" FontWeight="Bold" />
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="▼" FontSize="12" Foreground="#EF4444" />
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.NepseChange, Mode=OneWay}" FontSize="14" FontWeight="SemiBold" Foreground="#EF4444" />
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                             
-                            <Border Grid.Column="1" Padding="20,18" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <!-- Float, Sensitive, Sensitive Float from MajorIndices collection -->
+                            <Border Grid.Column="1" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" DataContext="{x:Bind ViewModel.StockMarket.MajorIndices[0], Mode=OneWay}">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="Traded Shares" Opacity="0.65" FontSize="13" />
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.TotalTradedShares, Mode=OneWay}" FontSize="26" FontWeight="Bold" />
+                                    <TextBlock Text="{Binding Name}" Opacity="0.6" FontSize="13" />
+                                    <TextBlock Text="{Binding Value}" FontSize="32" FontWeight="Bold" />
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="▼" FontSize="12" Foreground="#EF4444" />
+                                        <TextBlock Text="{Binding Change}" FontSize="14" FontWeight="SemiBold" Foreground="#EF4444" />
+                                        <TextBlock Text="{Binding ChangePercent}" FontSize="14" FontWeight="SemiBold" Foreground="#EF4444" />
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                             
-                            <Border Grid.Column="2" Padding="20,18" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <Border Grid.Column="2" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" DataContext="{x:Bind ViewModel.StockMarket.MajorIndices[1], Mode=OneWay}">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="Transactions" Opacity="0.65" FontSize="13" />
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.TotalTransactions, Mode=OneWay}" FontSize="26" FontWeight="Bold" />
+                                    <TextBlock Text="{Binding Name}" Opacity="0.6" FontSize="13" />
+                                    <TextBlock Text="{Binding Value}" FontSize="32" FontWeight="Bold" />
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="▼" FontSize="12" Foreground="#EF4444" />
+                                        <TextBlock Text="{Binding Change}" FontSize="14" FontWeight="SemiBold" Foreground="#EF4444" />
+                                        <TextBlock Text="{Binding ChangePercent}" FontSize="14" FontWeight="SemiBold" Foreground="#EF4444" />
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                             
-                            <Border Grid.Column="3" Padding="20,18" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                            <Border Grid.Column="3" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" DataContext="{x:Bind ViewModel.StockMarket.MajorIndices[2], Mode=OneWay}">
                                 <StackPanel Spacing="10">
-                                    <TextBlock Text="Scrips Traded" Opacity="0.65" FontSize="13" />
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.ScriptsTraded, Mode=OneWay}" FontSize="26" FontWeight="Bold" />
-                                </StackPanel>
-                            </Border>
-                            
-                            <Border Grid.Column="4" Padding="20,18" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                                <StackPanel Spacing="10">
-                                    <TextBlock Text="Market Cap" Opacity="0.65" FontSize="13" />
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.MarketCap, Mode=OneWay}" FontSize="26" FontWeight="Bold" />
-                                </StackPanel>
-                            </Border>
-                            
-                            <Border Grid.Column="5" Padding="20,18" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                                <StackPanel Spacing="10">
-                                    <TextBlock Text="Float Market Cap" Opacity="0.65" FontSize="13" />
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.FloatMarketCap, Mode=OneWay}" FontSize="26" FontWeight="Bold" />
+                                    <TextBlock Text="{Binding Name}" Opacity="0.6" FontSize="13" />
+                                    <TextBlock Text="{Binding Value}" FontSize="32" FontWeight="Bold" />
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="▼" FontSize="12" Foreground="#EF4444" />
+                                        <TextBlock Text="{Binding Change}" FontSize="14" FontWeight="SemiBold" Foreground="#EF4444" />
+                                        <TextBlock Text="{Binding ChangePercent}" FontSize="14" FontWeight="SemiBold" Foreground="#EF4444" />
+                                    </StackPanel>
                                 </StackPanel>
                             </Border>
                         </Grid>
 
-                        <!-- ROW 3: Main Indices - 4 Cards -->
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                            <ItemsControl ItemsSource="{x:Bind ViewModel.StockMarket.MajorIndices, Mode=OneWay}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <ItemsStackPanel Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Padding="28,22" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Margin="0,0,14,0" MinWidth="240">
-                                            <StackPanel Spacing="12">
-                                                <TextBlock Text="{Binding Name}" Opacity="0.7" FontSize="14" FontWeight="SemiBold" />
-                                                <TextBlock Text="{Binding Value}" FontSize="36" FontWeight="Bold" />
-                                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                                    <TextBlock Text="{Binding Change}" FontSize="16" FontWeight="SemiBold" />
-                                                    <TextBlock Text="{Binding ChangePercent}" FontSize="16" FontWeight="SemiBold" />
-                                                </StackPanel>
+                        <!-- MARKET ACTIVITY Section -->
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="MARKET ACTIVITY" FontSize="13" FontWeight="SemiBold" Opacity="0.5" />
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                
+                                <Border Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="Turnover" Opacity="0.6" FontSize="13" />
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.TotalTurnover, Mode=OneWay}" FontSize="32" FontWeight="Bold" />
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Grid.Column="1" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="Traded shares" Opacity="0.6" FontSize="13" />
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.TotalTradedShares, Mode=OneWay}" FontSize="32" FontWeight="Bold" />
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Grid.Column="2" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="Transactions" Opacity="0.6" FontSize="13" />
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.TotalTransactions, Mode=OneWay}" FontSize="32" FontWeight="Bold" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- MARKET SIZE Section -->
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="MARKET SIZE" FontSize="13" FontWeight="SemiBold" Opacity="0.5" />
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                
+                                <Border Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="Scrips traded" Opacity="0.6" FontSize="13" />
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.ScriptsTraded, Mode=OneWay}" FontSize="32" FontWeight="Bold" />
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Grid.Column="1" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="Market cap" Opacity="0.6" FontSize="13" />
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.MarketCap, Mode=OneWay}" FontSize="32" FontWeight="Bold" />
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Grid.Column="2" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <StackPanel Spacing="10">
+                                        <TextBlock Text="Float market cap" Opacity="0.6" FontSize="13" />
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.FloatMarketCap, Mode=OneWay}" FontSize="32" FontWeight="Bold" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- MARKET BREADTH Section -->
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="MARKET BREADTH" FontSize="13" FontWeight="SemiBold" Opacity="0.5" />
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                
+                                <Border Padding="24,28" CornerRadius="12" Background="#1522C55E">
+                                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.AdvancedCount, Mode=OneWay}" FontSize="48" FontWeight="Bold" Foreground="#22C55E" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Advanced" Opacity="0.85" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Grid.Column="1" Padding="24,28" CornerRadius="12" Background="#15EF4444">
+                                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.DeclinedCount, Mode=OneWay}" FontSize="48" FontWeight="Bold" Foreground="#EF4444" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Declined" Opacity="0.85" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Grid.Column="2" Padding="24,28" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.UnchangedCount, Mode=OneWay}" FontSize="48" FontWeight="Bold" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Unchanged" Opacity="0.7" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Grid.Column="3" Padding="24,28" CornerRadius="12" Background="#1522C55E">
+                                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.PositiveCircuitCount, Mode=OneWay}" FontSize="48" FontWeight="Bold" Foreground="#22C55E" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Positive circuit" Opacity="0.85" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                                
+                                <Border Grid.Column="4" Padding="24,28" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                                        <TextBlock Text="{x:Bind ViewModel.StockMarket.NegativeCircuitCount, Mode=OneWay}" FontSize="48" FontWeight="Bold" HorizontalAlignment="Center" />
+                                        <TextBlock Text="Negative circuit" Opacity="0.7" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+
+                        <!-- ROW 5 & 6: Sector Indices and Top Stocks Side by Side -->
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            
+                            <!-- LEFT: Sector Indices Table -->
+                            <Border Padding="0" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="0">
+                                    <!-- Section Header -->
+                                    <Grid Padding="24,20" Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="12,12,0,0">
+                                        <TextBlock Text="SECTOR INDICES" FontSize="16" FontWeight="Bold" />
+                                    </Grid>
+                                    
+                                    <!-- Table Header -->
+                                    <Grid Padding="24,16" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="SECTOR" FontSize="12" FontWeight="SemiBold" Opacity="0.6" />
+                                        <TextBlock Grid.Column="1" Text="INDEX" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="2" Text="%" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    
+                                    <!-- Table Rows -->
+                                    <ScrollViewer MaxHeight="600" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{x:Bind ViewModel.StockMarket.SectorIndices, Mode=OneWay}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Padding="24,14" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="2*" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding ChangePercent}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+                            
+                            <!-- RIGHT: Top Stocks with Tabs -->
+                            <Border Grid.Column="1" Padding="0" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <StackPanel Spacing="0">
+                                    <!-- Tab Headers -->
+                                    <Grid Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="12,12,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Click="TopGainersTab_Click" Padding="12,16" CornerRadius="12,0,0,0" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE735;" FontSize="12" />
+                                                <TextBlock Text="GAINERS" FontSize="11" FontWeight="SemiBold" />
                                             </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-
-                        <!-- ROW 4: Market Breadth - 5 Cards -->
-                        <Grid ColumnSpacing="14">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            
-                            <Border Padding="24,20" CornerRadius="12" Background="#1522C55E">
-                                <StackPanel Spacing="10" HorizontalAlignment="Center">
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.AdvancedCount, Mode=OneWay}" FontSize="42" FontWeight="Bold" Foreground="#22C55E" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Advanced" Opacity="0.85" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
-                            
-                            <Border Grid.Column="1" Padding="24,20" CornerRadius="12" Background="#15EF4444">
-                                <StackPanel Spacing="10" HorizontalAlignment="Center">
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.DeclinedCount, Mode=OneWay}" FontSize="42" FontWeight="Bold" Foreground="#EF4444" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Declined" Opacity="0.85" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
-                            
-                            <Border Grid.Column="2" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                                <StackPanel Spacing="10" HorizontalAlignment="Center">
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.UnchangedCount, Mode=OneWay}" FontSize="42" FontWeight="Bold" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Unchanged" Opacity="0.7" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
-                            
-                            <Border Grid.Column="3" Padding="24,20" CornerRadius="12" Background="#1522C55E">
-                                <StackPanel Spacing="10" HorizontalAlignment="Center">
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.PositiveCircuitCount, Mode=OneWay}" FontSize="42" FontWeight="Bold" Foreground="#22C55E" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Positive Circuit" Opacity="0.85" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                </StackPanel>
-                            </Border>
-                            
-                            <Border Grid.Column="4" Padding="24,20" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                                <StackPanel Spacing="10" HorizontalAlignment="Center">
-                                    <TextBlock Text="{x:Bind ViewModel.StockMarket.NegativeCircuitCount, Mode=OneWay}" FontSize="42" FontWeight="Bold" HorizontalAlignment="Center" />
-                                    <TextBlock Text="Negative Circuit" Opacity="0.7" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                        </Button>
+                                        <Button Grid.Column="1" Click="TopLosersTab_Click" Padding="12,16" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE74B;" FontSize="12" />
+                                                <TextBlock Text="LOSERS" FontSize="11" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="2" Click="TopTurnoverTab_Click" Padding="12,16" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE9D2;" FontSize="12" />
+                                                <TextBlock Text="TURNOVER" FontSize="11" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="3" Click="TopVolumeTab_Click" Padding="12,16" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE9F9;" FontSize="12" />
+                                                <TextBlock Text="VOLUME" FontSize="11" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="4" Click="TopTransactionsTab_Click" Padding="12,16" CornerRadius="0,12,0,0" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <FontIcon Glyph="&#xE8FD;" FontSize="12" />
+                                                <TextBlock Text="TRADES" FontSize="11" FontWeight="SemiBold" />
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    
+                                    <!-- Table Header -->
+                                    <Grid Padding="24,16" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="SYMBOL" FontSize="12" FontWeight="SemiBold" Opacity="0.6" />
+                                        <TextBlock Grid.Column="1" Text="LTP" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="2" Text="CHG" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="3" Text="%" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
+                                    </Grid>
+                                    
+                                    <!-- Table Rows - Dynamic based on selected tab -->
+                                    <ScrollViewer MaxHeight="600" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{x:Bind ViewModel.StockMarket.CurrentTopStocksList, Mode=OneWay}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Padding="24,14" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="2*" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                                            <Border Width="32" Height="32" CornerRadius="16" Background="{ThemeResource LayerFillColorDefaultBrush}">
+                                                                <Image Source="{Binding LogoUrl}" Stretch="UniformToFill" />
+                                                            </Border>
+                                                            <TextBlock Text="{Binding Symbol}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                        <TextBlock Grid.Column="1" Text="{Binding LastTradedPrice}" FontSize="15" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                        <TextBlock Grid.Column="2" Text="{Binding Change}" FontSize="15" FontWeight="SemiBold" Foreground="#22C55E" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                        <TextBlock Grid.Column="3" Text="{Binding Metric}" FontSize="15" FontWeight="SemiBold" Foreground="#22C55E" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
                                 </StackPanel>
                             </Border>
                         </Grid>
-
-                        <!-- ROW 5: Sector Indices - Table Format -->
-                        <Border Padding="0" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                            <StackPanel Spacing="0">
-                                <!-- Section Header -->
-                                <Grid Padding="24,20" Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="12,12,0,0">
-                                    <TextBlock Text="SECTOR INDICES" FontSize="16" FontWeight="Bold" />
-                                </Grid>
-                                
-                                <!-- Table Header -->
-                                <Grid Padding="24,16" Background="{ThemeResource LayerFillColorDefaultBrush}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="3*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="SECTOR" FontSize="12" FontWeight="SemiBold" Opacity="0.6" />
-                                    <TextBlock Grid.Column="1" Text="INDEX" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
-                                    <TextBlock Grid.Column="2" Text="CHANGE" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
-                                    <TextBlock Grid.Column="3" Text="%" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
-                                </Grid>
-                                
-                                <!-- Table Rows -->
-                                <ItemsControl ItemsSource="{x:Bind ViewModel.StockMarket.SectorIndices, Mode=OneWay}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Padding="24,14" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="3*" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                <TextBlock Grid.Column="2" Text="{Binding Change}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                <TextBlock Grid.Column="3" Text="{Binding ChangePercent}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- ROW 6: Top Stocks with Tabs - Table Format -->
-                        <Border Padding="0" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                            <StackPanel Spacing="0">
-                                <!-- Tab Headers -->
-                                <Grid Background="{ThemeResource LayerFillColorDefaultBrush}" CornerRadius="12,12,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button Click="TopGainersTab_Click" Padding="20,16" CornerRadius="12,0,0,0" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE735;" FontSize="14" />
-                                            <TextBlock Text="TOP GAINERS" FontSize="13" FontWeight="SemiBold" />
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Grid.Column="1" Click="TopLosersTab_Click" Padding="20,16" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE74B;" FontSize="14" />
-                                            <TextBlock Text="TOP LOSERS" FontSize="13" FontWeight="SemiBold" />
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Grid.Column="2" Click="TopTurnoverTab_Click" Padding="20,16" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE9D2;" FontSize="14" />
-                                            <TextBlock Text="TOP TURNOVER" FontSize="13" FontWeight="SemiBold" />
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Grid.Column="3" Click="TopVolumeTab_Click" Padding="20,16" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE9F9;" FontSize="14" />
-                                            <TextBlock Text="TOP VOLUME" FontSize="13" FontWeight="SemiBold" />
-                                        </StackPanel>
-                                    </Button>
-                                    <Button Grid.Column="4" Click="TopTransactionsTab_Click" Padding="20,16" CornerRadius="0,12,0,0" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center">
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE8FD;" FontSize="14" />
-                                            <TextBlock Text="TOP TRANSACTIONS" FontSize="13" FontWeight="SemiBold" />
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-                                
-                                <!-- Table Header -->
-                                <Grid Padding="24,16" Background="{ThemeResource LayerFillColorDefaultBrush}">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="2*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Text="SYMBOL" FontSize="12" FontWeight="SemiBold" Opacity="0.6" />
-                                    <TextBlock Grid.Column="1" Text="LTP" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
-                                    <TextBlock Grid.Column="2" Text="CHG" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
-                                    <TextBlock Grid.Column="3" Text="%" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
-                                </Grid>
-                                
-                                <!-- Table Rows - Dynamic based on selected tab -->
-                                <ItemsControl ItemsSource="{x:Bind ViewModel.StockMarket.CurrentTopStocksList, Mode=OneWay}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Grid Padding="24,14" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="2*" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                                    <Border Width="32" Height="32" CornerRadius="16" Background="{ThemeResource LayerFillColorDefaultBrush}">
-                                                        <Image Source="{Binding LogoUrl}" Stretch="UniformToFill" />
-                                                    </Border>
-                                                    <TextBlock Text="{Binding Symbol}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                </StackPanel>
-                                                <TextBlock Grid.Column="1" Text="{Binding LastTradedPrice}" FontSize="15" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                <TextBlock Grid.Column="2" Text="{Binding Change}" FontSize="15" FontWeight="SemiBold" Foreground="#22C55E" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                                <TextBlock Grid.Column="3" Text="{Binding Metric}" FontSize="15" FontWeight="SemiBold" Foreground="#22C55E" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
 
                         <!-- ROW 7: Live Market Data Table -->
                         <Border Padding="0" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">

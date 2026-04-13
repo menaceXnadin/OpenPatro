@@ -49,6 +49,11 @@ public sealed class StockMarketViewModel : BindableBase
     {
         _services = services;
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
+
+        // Keep at least 3 entries for index-based XAML bindings (MajorIndices[0..2]).
+        MajorIndices.Add(CreatePlaceholderIndex());
+        MajorIndices.Add(CreatePlaceholderIndex());
+        MajorIndices.Add(CreatePlaceholderIndex());
     }
 
     public ICommand RefreshCommand { get; }
@@ -285,7 +290,7 @@ public sealed class StockMarketViewModel : BindableBase
 
     public async Task InitializeAsync()
     {
-        if (MajorIndices.Count > 0 || TopGainers.Count > 0 || TopLosers.Count > 0 || LiveCompanies.Count > 0)
+        if (TopGainers.Count > 0 || TopLosers.Count > 0 || LiveCompanies.Count > 0)
         {
             return;
         }
@@ -295,12 +300,18 @@ public sealed class StockMarketViewModel : BindableBase
 
     public async Task RefreshAsync()
     {
+        if (IsBusy)
+        {
+            return;
+        }
+
         IsBusy = true;
         ErrorMessage = string.Empty;
 
         try
         {
-            var response = await _services.ShareHubNepse.FetchHomePageDataAsync();
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(25));
+            var response = await _services.ShareHubNepse.FetchHomePageDataAsync(cts.Token);
             if (response is null)
             {
                 ErrorMessage = "No stock market data returned by the server.";
@@ -308,6 +319,10 @@ public sealed class StockMarketViewModel : BindableBase
             }
 
             MapResponse(response);
+        }
+        catch (OperationCanceledException)
+        {
+            ErrorMessage = "Stock market request timed out. Please try refresh again.";
         }
         catch (Exception ex)
         {
@@ -381,13 +396,15 @@ public sealed class StockMarketViewModel : BindableBase
             NepseChange = "--";
         }
 
-        ReplaceCollection(MajorIndices, (response.Indices ?? new List<MarketIndexInfo>())
+        ReplaceFixedCollection(MajorIndices, (response.Indices ?? new List<MarketIndexInfo>())
             .Select(i => new IndexSnapshotViewModel(
                 NormalizeWhitespace(i.Name),
                 i.Symbol,
                 i.CurrentValue.ToString("N2", CultureInfo.InvariantCulture),
                 $"{i.Change:+0.##;-0.##;0}",
-                i.ChangePercent)));
+                i.ChangePercent)),
+            3,
+            CreatePlaceholderIndex);
 
         ReplaceCollection(SectorIndices, (response.SubIndices ?? new List<MarketIndexInfo>())
             .Select(i => new IndexSnapshotViewModel(
@@ -477,6 +494,39 @@ public sealed class StockMarketViewModel : BindableBase
         {
             target.Add(item);
         }
+    }
+
+    private static void ReplaceFixedCollection<T>(
+        ObservableCollection<T> target,
+        IEnumerable<T> source,
+        int minimumCount,
+        Func<T> placeholderFactory)
+    {
+        var items = source.ToList();
+        while (items.Count < minimumCount)
+        {
+            items.Add(placeholderFactory());
+        }
+
+        while (target.Count < items.Count)
+        {
+            target.Add(placeholderFactory());
+        }
+
+        while (target.Count > items.Count)
+        {
+            target.RemoveAt(target.Count - 1);
+        }
+
+        for (var i = 0; i < items.Count; i++)
+        {
+            target[i] = items[i];
+        }
+    }
+
+    private static IndexSnapshotViewModel CreatePlaceholderIndex()
+    {
+        return new IndexSnapshotViewModel("--", "--", "--", "--", 0m);
     }
 
     private static string TryFormatUtc(string? input)
