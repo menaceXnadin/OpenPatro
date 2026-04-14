@@ -131,6 +131,15 @@ public sealed class MarketMoverInfo
 
     [JsonPropertyName("companyLogo")]
     public string? CompanyLogo { get; set; }
+
+    [JsonPropertyName("icon")]
+    public string? Icon { get; set; }
+
+    [JsonIgnore]
+    public string? LogoPath =>
+        !string.IsNullOrWhiteSpace(CompanyLogo)
+            ? CompanyLogo
+            : Icon;
 }
 
 public sealed class LiveCompanyDataInfo
@@ -179,4 +188,18 @@ public sealed class LiveCompanyDataInfo
 
     [JsonPropertyName("companyLogo")]
     public string? CompanyLogo { get; set; }
+
+    [JsonPropertyName("iconUrl")]
+    public string? IconUrl { get; set; }
+
+    [JsonPropertyName("icon")]
+    public string? Icon { get; set; }
+
+    [JsonIgnore]
+    public string? LogoPath =>
+        !string.IsNullOrWhiteSpace(CompanyLogo)
+            ? CompanyLogo
+            : !string.IsNullOrWhiteSpace(IconUrl)
+                ? IconUrl
+                : Icon;
 }

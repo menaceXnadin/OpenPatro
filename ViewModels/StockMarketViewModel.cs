@@ -44,13 +44,21 @@ public sealed class StockMarketViewModel : BindableBase
     private int _positiveCircuitCount;
     private int _negativeCircuitCount;
     private string _marketStatusBadgeColor = "#808080";
+    private string _sectorSortColumn = "Name";
+    private bool _sectorSortAscending = true;
+    private string _topStocksSortColumn = "Metric";
+    private bool _topStocksSortAscending = false;
+    private bool _hasUserSortedTopStocks = false;
+    private string _liveSortColumn = "Symbol";
+    private bool _liveSortAscending = true;
 
     public StockMarketViewModel(AppServices services)
     {
         _services = services;
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
 
-        // Keep at least 3 entries for index-based XAML bindings (MajorIndices[0..2]).
+        // Keep at least 4 entries for index-based XAML bindings (MajorIndices[0..3]).
+        MajorIndices.Add(CreatePlaceholderIndex());
         MajorIndices.Add(CreatePlaceholderIndex());
         MajorIndices.Add(CreatePlaceholderIndex());
         MajorIndices.Add(CreatePlaceholderIndex());
@@ -75,6 +83,10 @@ public sealed class StockMarketViewModel : BindableBase
     public ObservableCollection<MarketMoverRowViewModel> TopTransactions { get; } = new();
 
     public ObservableCollection<LiveCompanyRowViewModel> LiveCompanies { get; } = new();
+
+    public ObservableCollection<LiveCompanyRowViewModel> FilteredLiveCompanies { get; } = new();
+
+    private string _liveMarketSearchText = string.Empty;
 
     public bool IsBusy
     {
@@ -288,6 +300,18 @@ public sealed class StockMarketViewModel : BindableBase
         private set => SetProperty(ref _marketStatusBadgeColor, value);
     }
 
+    public string SectorSortColumn => _sectorSortColumn;
+
+    public bool IsSectorSortAscending => _sectorSortAscending;
+
+    public string TopStocksSortColumn => _topStocksSortColumn;
+
+    public bool IsTopStocksSortAscending => _topStocksSortAscending;
+
+    public string LiveSortColumn => _liveSortColumn;
+
+    public bool IsLiveSortAscending => _liveSortAscending;
+
     public async Task InitializeAsync()
     {
         if (TopGainers.Count > 0 || TopLosers.Count > 0 || LiveCompanies.Count > 0)
@@ -403,7 +427,7 @@ public sealed class StockMarketViewModel : BindableBase
                 i.CurrentValue.ToString("N2", CultureInfo.InvariantCulture),
                 $"{i.Change:+0.##;-0.##;0}",
                 i.ChangePercent)),
-            3,
+            4,
             CreatePlaceholderIndex);
 
         ReplaceCollection(SectorIndices, (response.SubIndices ?? new List<MarketIndexInfo>())
@@ -412,7 +436,8 @@ public sealed class StockMarketViewModel : BindableBase
                 i.Symbol,
                 i.CurrentValue.ToString("N2", CultureInfo.InvariantCulture),
                 $"{i.Change:+0.##;-0.##;0}",
-                i.ChangePercent)));
+                i.ChangePercent,
+                i.CurrentValue)));
 
         ReplaceCollection(TopGainers, (response.TopGainers ?? new List<MarketMoverInfo>())
             .Select(m => new MarketMoverRowViewModel(
@@ -421,8 +446,11 @@ public sealed class StockMarketViewModel : BindableBase
                 m.LastTradedPrice.ToString("N2", CultureInfo.InvariantCulture),
                 $"+{m.Change:0.##}",
                 $"{m.ChangePercent:+0.##;-0.##;0}%",
+                m.LastTradedPrice,
+                m.Change,
+                m.ChangePercent,
                 "▲",
-                m.CompanyLogo)));
+                m.LogoPath)));
 
         ReplaceCollection(TopLosers, (response.TopLosers ?? new List<MarketMoverInfo>())
             .Select(m => new MarketMoverRowViewModel(
@@ -431,8 +459,11 @@ public sealed class StockMarketViewModel : BindableBase
                 m.LastTradedPrice.ToString("N2", CultureInfo.InvariantCulture),
                 $"{m.Change:0.##}",
                 $"{m.ChangePercent:+0.##;-0.##;0}%",
+                m.LastTradedPrice,
+                m.Change,
+                m.ChangePercent,
                 "▼",
-                m.CompanyLogo)));
+                m.LogoPath)));
 
         ReplaceCollection(TopTurnover, (response.TopTurnover ?? new List<MarketMoverInfo>())
             .Select(m => new MarketMoverRowViewModel(
@@ -441,8 +472,11 @@ public sealed class StockMarketViewModel : BindableBase
                 m.LastTradedPrice.ToString("N2", CultureInfo.InvariantCulture),
                 $"{m.Change:+0.##;-0.##;0}",
                 FormatLargeNumber(m.Turnover),
+                m.LastTradedPrice,
+                m.Change,
+                m.Turnover,
                 "Rs",
-                m.CompanyLogo)));
+                m.LogoPath)));
 
         ReplaceCollection(TopTradedShares, (response.TopTradedShares ?? new List<MarketMoverInfo>())
             .Select(m => new MarketMoverRowViewModel(
@@ -451,8 +485,11 @@ public sealed class StockMarketViewModel : BindableBase
                 m.LastTradedPrice.ToString("N2", CultureInfo.InvariantCulture),
                 $"{m.Change:+0.##;-0.##;0}",
                 FormatLargeNumber(m.SharesTraded),
+                m.LastTradedPrice,
+                m.Change,
+                m.SharesTraded,
                 "Qty",
-                m.CompanyLogo)));
+                m.LogoPath)));
 
         ReplaceCollection(TopTransactions, (response.TopTransactions ?? new List<MarketMoverInfo>())
             .Select(m => new MarketMoverRowViewModel(
@@ -461,8 +498,11 @@ public sealed class StockMarketViewModel : BindableBase
                 m.LastTradedPrice.ToString("N2", CultureInfo.InvariantCulture),
                 $"{m.Change:+0.##;-0.##;0}",
                 FormatCount(m.Transactions),
+                m.LastTradedPrice,
+                m.Change,
+                m.Transactions,
                 "Tx",
-                m.CompanyLogo)));
+                m.LogoPath)));
 
         ReplaceCollection(LiveCompanies, (response.LiveCompanyData ?? new List<LiveCompanyDataInfo>())
             .Select(c => new LiveCompanyRowViewModel(
@@ -478,7 +518,27 @@ public sealed class StockMarketViewModel : BindableBase
                 c.TotalTradeQuantity.ToString("N2", CultureInfo.InvariantCulture),
                 c.TotalTradeValue.ToString("N2", CultureInfo.InvariantCulture),
                 c.TotalTransactions.ToString("N0", CultureInfo.InvariantCulture),
-                c.CompanyLogo)));
+                c.OpenPrice,
+                c.HighPrice,
+                c.LowPrice,
+                c.LastTradedPrice,
+                c.PreviousClose,
+                c.PercentageChange,
+                c.TotalTradeQuantity,
+                c.TotalTradeValue,
+                c.TotalTransactions,
+                c.LogoPath)));
+
+        ApplySectorSort();
+        
+        // Only apply top stocks sort if user has manually sorted
+        // Otherwise, keep the API's original order (which is already correct)
+        if (_hasUserSortedTopStocks)
+        {
+            ApplyTopStocksSort();
+        }
+        
+        ApplyLiveCompaniesSort();
 
         DemandCount = GetJsonArrayCount(response.Demand).ToString(CultureInfo.InvariantCulture);
         SupplyCount = GetJsonArrayCount(response.Supply).ToString(CultureInfo.InvariantCulture);
@@ -489,10 +549,36 @@ public sealed class StockMarketViewModel : BindableBase
 
     private static void ReplaceCollection<T>(ObservableCollection<T> target, IEnumerable<T> source)
     {
-        target.Clear();
-        foreach (var item in source)
+        var sourceList = source.ToList();
+        
+        // Optimization 1: Skip if collections are identical
+        if (target.Count == sourceList.Count && target.SequenceEqual(sourceList))
         {
-            target.Add(item);
+            return;
+        }
+
+        // Optimization 2: Update in-place when possible to avoid full Clear/Add cycle
+        int i = 0;
+        foreach (var item in sourceList)
+        {
+            if (i < target.Count)
+            {
+                if (!EqualityComparer<T>.Default.Equals(target[i], item))
+                {
+                    target[i] = item;
+                }
+            }
+            else
+            {
+                target.Add(item);
+            }
+            i++;
+        }
+
+        // Remove excess items from the end
+        while (target.Count > sourceList.Count)
+        {
+            target.RemoveAt(target.Count - 1);
         }
     }
 
@@ -588,23 +674,176 @@ public sealed class StockMarketViewModel : BindableBase
 
     private static string FormatLargeNumber(decimal value)
     {
-        if (value >= 1_000_000_000_000) // Trillion
-        {
-            return $"{value / 1_000_000_000_000:0.##} T";
-        }
-        if (value >= 1_000_000_000) // Billion
-        {
-            return $"{value / 1_000_000_000:0.##} B";
-        }
-        if (value >= 1_000_000) // Million
-        {
-            return $"{value / 1_000_000:0.##} M";
-        }
-        if (value >= 1_000) // Thousand
-        {
-            return $"{value / 1_000:0.##} K";
-        }
+        // Show full numbers with comma separators instead of abbreviations
         return value.ToString("N0", CultureInfo.InvariantCulture);
+    }
+
+    public void SortSectorBy(string column)
+    {
+        if (string.Equals(_sectorSortColumn, column, StringComparison.Ordinal))
+        {
+            _sectorSortAscending = !_sectorSortAscending;
+        }
+        else
+        {
+            _sectorSortColumn = column;
+            _sectorSortAscending = true;
+        }
+
+        ApplySectorSort();
+        RaisePropertyChanged(nameof(SectorSortColumn));
+        RaisePropertyChanged(nameof(IsSectorSortAscending));
+    }
+
+    public void SortTopStocksBy(string column)
+    {
+        _hasUserSortedTopStocks = true;
+        
+        if (string.Equals(_topStocksSortColumn, column, StringComparison.Ordinal))
+        {
+            _topStocksSortAscending = !_topStocksSortAscending;
+        }
+        else
+        {
+            _topStocksSortColumn = column;
+            _topStocksSortAscending = true;
+        }
+
+        ApplyTopStocksSort();
+        RaisePropertyChanged(nameof(TopStocksSortColumn));
+        RaisePropertyChanged(nameof(IsTopStocksSortAscending));
+    }
+
+    public void SortLiveCompaniesBy(string column)
+    {
+        if (string.Equals(_liveSortColumn, column, StringComparison.Ordinal))
+        {
+            _liveSortAscending = !_liveSortAscending;
+        }
+        else
+        {
+            _liveSortColumn = column;
+            _liveSortAscending = true;
+        }
+
+        ApplyLiveCompaniesSort();
+        RaisePropertyChanged(nameof(LiveSortColumn));
+        RaisePropertyChanged(nameof(IsLiveSortAscending));
+    }
+
+    private void ApplySectorSort()
+    {
+        var sortedList = SectorIndices.ToList();
+        
+        Comparison<IndexSnapshotViewModel> comparison = _sectorSortColumn switch
+        {
+            "Value" => (a, b) => a.CurrentValueNumeric.CompareTo(b.CurrentValueNumeric),
+            "ChangePercent" => (a, b) => a.ChangePercentNumeric.CompareTo(b.ChangePercentNumeric),
+            _ => (a, b) => string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase)
+        };
+
+        // Reverse comparison for descending sort
+        if (!_sectorSortAscending)
+        {
+            var originalComparison = comparison;
+            comparison = (a, b) => originalComparison(b, a);
+        }
+
+        sortedList.Sort(comparison);
+        ReplaceCollection(SectorIndices, sortedList);
+    }
+
+    private void ApplyTopStocksSort()
+    {
+        SortTopCollection(TopGainers);
+        SortTopCollection(TopLosers);
+        SortTopCollection(TopTurnover);
+        SortTopCollection(TopTradedShares);
+        SortTopCollection(TopTransactions);
+        RaisePropertyChanged(nameof(CurrentTopStocksList));
+    }
+
+    private void SortTopCollection(ObservableCollection<MarketMoverRowViewModel> target)
+    {
+        var sortedList = target.ToList();
+        
+        Comparison<MarketMoverRowViewModel> comparison = _topStocksSortColumn switch
+        {
+            "Ltp" => (a, b) => a.LastTradedPriceValue.CompareTo(b.LastTradedPriceValue),
+            "Change" => (a, b) => a.ChangeValue.CompareTo(b.ChangeValue),
+            "Metric" => (a, b) => a.MetricValue.CompareTo(b.MetricValue),
+            _ => (a, b) => string.Compare(a.Symbol, b.Symbol, StringComparison.OrdinalIgnoreCase)
+        };
+
+        // Reverse comparison for descending sort
+        if (!_topStocksSortAscending)
+        {
+            var originalComparison = comparison;
+            comparison = (a, b) => originalComparison(b, a);
+        }
+
+        sortedList.Sort(comparison);
+        ReplaceCollection(target, sortedList);
+    }
+
+    private void ApplyLiveCompaniesSort()
+    {
+        // For large collections, use List.Sort which is more efficient than LINQ OrderBy
+        var sortedList = LiveCompanies.ToList();
+        
+        Comparison<LiveCompanyRowViewModel> comparison = _liveSortColumn switch
+        {
+            "Logo" => (a, b) => string.Compare(a.LogoUrl, b.LogoUrl, StringComparison.OrdinalIgnoreCase),
+            "Name" => (a, b) => string.Compare(a.SecurityName, b.SecurityName, StringComparison.OrdinalIgnoreCase),
+            "Sector" => (a, b) => string.Compare(a.Sector, b.Sector, StringComparison.OrdinalIgnoreCase),
+            "Open" => (a, b) => a.OpenPriceValue.CompareTo(b.OpenPriceValue),
+            "High" => (a, b) => a.HighPriceValue.CompareTo(b.HighPriceValue),
+            "Low" => (a, b) => a.LowPriceValue.CompareTo(b.LowPriceValue),
+            "Ltp" => (a, b) => a.LastTradedPriceValue.CompareTo(b.LastTradedPriceValue),
+            "Prev" => (a, b) => a.PreviousCloseValue.CompareTo(b.PreviousCloseValue),
+            "ChangePercent" => (a, b) => a.ChangePercentValue.CompareTo(b.ChangePercentValue),
+            "Volume" => (a, b) => a.QuantityValue.CompareTo(b.QuantityValue),
+            "Turnover" => (a, b) => a.TurnoverValue.CompareTo(b.TurnoverValue),
+            "Trades" => (a, b) => a.TransactionsValue.CompareTo(b.TransactionsValue),
+            _ => (a, b) => string.Compare(a.Symbol, b.Symbol, StringComparison.OrdinalIgnoreCase)
+        };
+
+        // Reverse comparison for descending sort
+        if (!_liveSortAscending)
+        {
+            var originalComparison = comparison;
+            comparison = (a, b) => originalComparison(b, a);
+        }
+
+        sortedList.Sort(comparison);
+        ReplaceCollection(LiveCompanies, sortedList);
+        ApplyLiveMarketFilter();
+    }
+
+    public void FilterLiveMarket(string searchText)
+    {
+        _liveMarketSearchText = searchText?.Trim() ?? string.Empty;
+        ApplyLiveMarketFilter();
+    }
+
+    private void ApplyLiveMarketFilter()
+    {
+        if (string.IsNullOrWhiteSpace(_liveMarketSearchText))
+        {
+            // No filter, show all companies
+            ReplaceCollection(FilteredLiveCompanies, LiveCompanies);
+        }
+        else
+        {
+            // Filter by symbol, name, or sector
+            var filtered = LiveCompanies.Where(c =>
+                c.Symbol.Contains(_liveMarketSearchText, StringComparison.OrdinalIgnoreCase) ||
+                c.SecurityName.Contains(_liveMarketSearchText, StringComparison.OrdinalIgnoreCase) ||
+                c.Sector.Contains(_liveMarketSearchText, StringComparison.OrdinalIgnoreCase)
+            ).ToList();
+            
+            ReplaceCollection(FilteredLiveCompanies, filtered);
+        }
     }
 }
 
@@ -623,15 +862,22 @@ public sealed class MarketSummaryRowViewModel
 
 public sealed class IndexSnapshotViewModel
 {
-    public IndexSnapshotViewModel(string name, string symbol, string value, string change, decimal changePercent)
+    public IndexSnapshotViewModel(string name, string symbol, string value, string change, decimal changePercent, decimal currentValue = 0m)
     {
         Name = name;
         Symbol = symbol;
         Value = value;
         Change = change;
         ChangePercent = $"{changePercent:+0.##;-0.##;0}%";
+        CurrentValueNumeric = currentValue;
+        ChangePercentNumeric = changePercent;
         IsPositive = changePercent >= 0;
         IsNegative = changePercent < 0;
+        
+        // Arrow and color for UI
+        Arrow = changePercent >= 0 ? "▲" : "▼";
+        ArrowColor = changePercent >= 0 ? "#22C55E" : "#EF4444";
+        ChangeColor = changePercent >= 0 ? "#22C55E" : "#EF4444";
     }
 
     public string Name { get; }
@@ -644,24 +890,69 @@ public sealed class IndexSnapshotViewModel
 
     public string ChangePercent { get; }
 
+    public decimal CurrentValueNumeric { get; }
+
+    public decimal ChangePercentNumeric { get; }
+
     public bool IsPositive { get; }
 
     public bool IsNegative { get; }
+    
+    public string Arrow { get; }
+    
+    public string ArrowColor { get; }
+    
+    public string ChangeColor { get; }
 }
 
 public sealed class MarketMoverRowViewModel
 {
-    public MarketMoverRowViewModel(string symbol, string name, string ltp, string change, string metric, string badge, string? logoPath)
+    public MarketMoverRowViewModel(string symbol, string name, string ltp, string change, string metric, decimal ltpValue, decimal changeValue, decimal metricValue, string badge, string? logoPath)
     {
         Symbol = symbol;
         Name = name;
         LastTradedPrice = ltp;
         Change = change;
         Metric = metric;
+        LastTradedPriceValue = ltpValue;
+        ChangeValue = changeValue;
+        MetricValue = metricValue;
         Badge = badge;
         LogoUrl = string.IsNullOrWhiteSpace(logoPath) 
             ? string.Empty 
             : $"https://cdn.arthakendra.com/{logoPath}";
+        
+        // Determine color based on badge
+        if (badge == "▲")
+        {
+            ChangeColor = "#22C55E"; // Green for gainers
+            MetricColor = "#22C55E";
+        }
+        else if (badge == "▼")
+        {
+            ChangeColor = "#EF4444"; // Red for losers
+            MetricColor = "#EF4444";
+        }
+        else if (badge == "Rs")
+        {
+            ChangeColor = "#3B82F6"; // Blue for turnover
+            MetricColor = "#3B82F6";
+        }
+        else if (badge == "Qty")
+        {
+            ChangeColor = "#8B5CF6"; // Purple for volume
+            MetricColor = "#8B5CF6";
+        }
+        else if (badge == "Tx")
+        {
+            ChangeColor = "#F59E0B"; // Amber for trades
+            MetricColor = "#F59E0B";
+        }
+        else
+        {
+            ChangeColor = "#22C55E"; // Default green
+            MetricColor = "#22C55E";
+        }
     }
 
     public string Symbol { get; }
@@ -674,14 +965,24 @@ public sealed class MarketMoverRowViewModel
 
     public string Metric { get; }
 
+    public decimal LastTradedPriceValue { get; }
+
+    public decimal ChangeValue { get; }
+
+    public decimal MetricValue { get; }
+
     public string Badge { get; }
 
     public string LogoUrl { get; }
+
+    public string ChangeColor { get; }
+
+    public string MetricColor { get; }
 }
 
 public sealed class LiveCompanyRowViewModel
 {
-    public LiveCompanyRowViewModel(string symbol, string securityName, string sector, string open, string high, string low, string ltp, string prevClose, string changePercent, string turnover, string quantity, string transactions, string? logoPath)
+    public LiveCompanyRowViewModel(string symbol, string securityName, string sector, string open, string high, string low, string ltp, string prevClose, string changePercent, string turnover, string quantity, string transactions, decimal openValue, decimal highValue, decimal lowValue, decimal ltpValue, decimal previousCloseValue, decimal changePercentValue, decimal quantityValue, decimal turnoverValue, int transactionsValue, string? logoPath)
     {
         Symbol = symbol;
         SecurityName = securityName;
@@ -695,9 +996,50 @@ public sealed class LiveCompanyRowViewModel
         Turnover = turnover;
         Quantity = quantity;
         Transactions = transactions;
+        OpenPriceValue = openValue;
+        HighPriceValue = highValue;
+        LowPriceValue = lowValue;
+        LastTradedPriceValue = ltpValue;
+        PreviousCloseValue = previousCloseValue;
+        ChangePercentValue = changePercentValue;
+        QuantityValue = quantityValue;
+        TurnoverValue = turnoverValue;
+        TransactionsValue = transactionsValue;
+
+        RowBackground = changePercentValue > 0m
+            ? "#1322C55E"
+            : changePercentValue < 0m
+                ? "#13EF4444"
+                : "Transparent";
+
+        OpenPriceColor = GetSignedColor(openValue - previousCloseValue);
+        HighPriceColor = GetSignedColor(highValue - previousCloseValue);
+        LowPriceColor = GetSignedColor(lowValue - previousCloseValue);
+        LastTradedPriceColor = GetSignedColor(ltpValue - previousCloseValue);
+        PreviousCloseColor = "#9CA3AF";
+        ChangePercentColor = GetSignedColor(changePercentValue);
+        QuantityColor = GetSignedColor(changePercentValue);
+        TurnoverColor = GetSignedColor(changePercentValue);
+        TransactionsColor = GetSignedColor(changePercentValue);
+
         LogoUrl = string.IsNullOrWhiteSpace(logoPath) 
             ? string.Empty 
             : $"https://cdn.arthakendra.com/{logoPath}";
+    }
+
+    private static string GetSignedColor(decimal value)
+    {
+        if (value > 0m)
+        {
+            return "#22C55E";
+        }
+
+        if (value < 0m)
+        {
+            return "#EF4444";
+        }
+
+        return "#A3A3A3";
     }
 
     public string Symbol { get; }
@@ -723,6 +1065,44 @@ public sealed class LiveCompanyRowViewModel
     public string Quantity { get; }
 
     public string Transactions { get; }
+
+    public decimal OpenPriceValue { get; }
+
+    public decimal HighPriceValue { get; }
+
+    public decimal LowPriceValue { get; }
+
+    public decimal LastTradedPriceValue { get; }
+
+    public decimal PreviousCloseValue { get; }
+
+    public decimal ChangePercentValue { get; }
+
+    public decimal QuantityValue { get; }
+
+    public decimal TurnoverValue { get; }
+
+    public int TransactionsValue { get; }
+
+    public string RowBackground { get; }
+
+    public string OpenPriceColor { get; }
+
+    public string HighPriceColor { get; }
+
+    public string LowPriceColor { get; }
+
+    public string LastTradedPriceColor { get; }
+
+    public string PreviousCloseColor { get; }
+
+    public string ChangePercentColor { get; }
+
+    public string QuantityColor { get; }
+
+    public string TurnoverColor { get; }
+
+    public string TransactionsColor { get; }
 
     public string LogoUrl { get; }
 }

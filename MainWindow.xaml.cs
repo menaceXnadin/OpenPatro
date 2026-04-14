@@ -157,6 +157,7 @@ namespace OpenPatro
             SyncCalendarNavigationSelections();
             UpdateDateConverterMonthLabels();
             SyncDateConverterInputParts();
+            UpdateSortIcons();
 
             if (AppWindow.Presenter is OverlappedPresenter presenter)
             {
@@ -261,6 +262,10 @@ namespace OpenPatro
             ViewModel.SelectedSection = ShellSection.StockMarket;
             UpdateSectionVisibility();
             await ViewModel.StockMarket.InitializeAsync();
+            UpdateSortIcons();
+            
+            // Initialize the first tab as selected
+            UpdateTopStocksTabStates("TopGainers");
         }
 
         private async void RashifalButton_Checked(object sender, RoutedEventArgs e)
@@ -295,26 +300,193 @@ namespace OpenPatro
         private void TopGainersTab_Click(object sender, RoutedEventArgs e)
         {
             ViewModel.StockMarket.SelectedTopStocksTab = "TopGainers";
+            UpdateTopStocksTabStates("TopGainers");
         }
 
         private void TopLosersTab_Click(object sender, RoutedEventArgs e)
         {
             ViewModel.StockMarket.SelectedTopStocksTab = "TopLosers";
+            UpdateTopStocksTabStates("TopLosers");
         }
 
         private void TopTurnoverTab_Click(object sender, RoutedEventArgs e)
         {
             ViewModel.StockMarket.SelectedTopStocksTab = "TopTurnover";
+            UpdateTopStocksTabStates("TopTurnover");
         }
 
         private void TopVolumeTab_Click(object sender, RoutedEventArgs e)
         {
             ViewModel.StockMarket.SelectedTopStocksTab = "TopVolume";
+            UpdateTopStocksTabStates("TopVolume");
         }
 
         private void TopTransactionsTab_Click(object sender, RoutedEventArgs e)
         {
             ViewModel.StockMarket.SelectedTopStocksTab = "TopTransactions";
+            UpdateTopStocksTabStates("TopTransactions");
+        }
+
+        private void SectorHeader_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.Tag is string column)
+            {
+                ViewModel.StockMarket.SortSectorBy(column);
+                UpdateSectorSortIcons();
+            }
+        }
+
+        private void TopStocksHeader_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.Tag is string column)
+            {
+                ViewModel.StockMarket.SortTopStocksBy(column);
+                UpdateTopStocksSortIcons();
+            }
+        }
+
+        private void LiveMarketHeader_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement element && element.Tag is string column)
+            {
+                ViewModel.StockMarket.SortLiveCompaniesBy(column);
+                UpdateLiveSortIcons();
+            }
+        }
+
+        private void UpdateSortIcons()
+        {
+            UpdateSectorSortIcons();
+            UpdateTopStocksSortIcons();
+            UpdateLiveSortIcons();
+        }
+
+        private void UpdateSectorSortIcons()
+        {
+            var sortName = FindSortIcon("SectorSortNameIcon");
+            var sortValue = FindSortIcon("SectorSortValueIcon");
+            var sortPercent = FindSortIcon("SectorSortPercentIcon");
+
+            ResetSortIcons(sortName, sortValue, sortPercent);
+
+            var active = ViewModel.StockMarket.SectorSortColumn switch
+            {
+                "Value" => sortValue,
+                "ChangePercent" => sortPercent,
+                _ => sortName
+            };
+
+            ApplyActiveSortIcon(active, ViewModel.StockMarket.IsSectorSortAscending);
+        }
+
+        private void UpdateTopStocksSortIcons()
+        {
+            var sortSymbol = FindSortIcon("TopSortSymbolIcon");
+            var sortLtp = FindSortIcon("TopSortLtpIcon");
+            var sortChange = FindSortIcon("TopSortChangeIcon");
+            var sortMetric = FindSortIcon("TopSortMetricIcon");
+
+            ResetSortIcons(sortSymbol, sortLtp, sortChange, sortMetric);
+
+            var active = ViewModel.StockMarket.TopStocksSortColumn switch
+            {
+                "Ltp" => sortLtp,
+                "Change" => sortChange,
+                "Metric" => sortMetric,
+                _ => sortSymbol
+            };
+
+            ApplyActiveSortIcon(active, ViewModel.StockMarket.IsTopStocksSortAscending);
+        }
+
+        private void UpdateLiveSortIcons()
+        {
+            var sortLogo = FindSortIcon("LiveSortLogoIcon");
+            var sortSymbol = FindSortIcon("LiveSortSymbolIcon");
+            var sortName = FindSortIcon("LiveSortNameIcon");
+            var sortSector = FindSortIcon("LiveSortSectorIcon");
+            var sortOpen = FindSortIcon("LiveSortOpenIcon");
+            var sortHigh = FindSortIcon("LiveSortHighIcon");
+            var sortLow = FindSortIcon("LiveSortLowIcon");
+            var sortLtp = FindSortIcon("LiveSortLtpIcon");
+            var sortPrev = FindSortIcon("LiveSortPrevIcon");
+            var sortChangePercent = FindSortIcon("LiveSortChangePercentIcon");
+            var sortVolume = FindSortIcon("LiveSortVolumeIcon");
+            var sortTurnover = FindSortIcon("LiveSortTurnoverIcon");
+            var sortTrades = FindSortIcon("LiveSortTradesIcon");
+
+            ResetSortIcons(
+                sortLogo, sortSymbol, sortName, sortSector,
+                sortOpen, sortHigh, sortLow, sortLtp,
+                sortPrev, sortChangePercent, sortVolume,
+                sortTurnover, sortTrades);
+
+            var active = ViewModel.StockMarket.LiveSortColumn switch
+            {
+                "Logo" => sortLogo,
+                "Name" => sortName,
+                "Sector" => sortSector,
+                "Open" => sortOpen,
+                "High" => sortHigh,
+                "Low" => sortLow,
+                "Ltp" => sortLtp,
+                "Prev" => sortPrev,
+                "ChangePercent" => sortChangePercent,
+                "Volume" => sortVolume,
+                "Turnover" => sortTurnover,
+                "Trades" => sortTrades,
+                _ => sortSymbol
+            };
+
+            ApplyActiveSortIcon(active, ViewModel.StockMarket.IsLiveSortAscending);
+        }
+
+        private void LiveMarketSearchBox_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
+        {
+            if (args.Reason == AutoSuggestionBoxTextChangeReason.UserInput)
+            {
+                ViewModel.StockMarket.FilterLiveMarket(sender.Text);
+            }
+        }
+
+        private FontIcon? FindSortIcon(string name)
+        {
+            return RootGrid?.FindName(name) as FontIcon;
+        }
+
+        private static void ResetSortIcons(params FontIcon?[] icons)
+        {
+            foreach (var icon in icons)
+            {
+                if (icon is null)
+                {
+                    continue;
+                }
+
+                icon.FontFamily = new FontFamily("Segoe UI Symbol");
+                icon.Glyph = "↕";
+                icon.Opacity = 0.6;
+            }
+        }
+
+        private static void ApplyActiveSortIcon(FontIcon? icon, bool isAscending)
+        {
+            if (icon is null)
+            {
+                return;
+            }
+
+            icon.Glyph = isAscending ? "↑" : "↓";
+            icon.Opacity = 1;
+        }
+
+        private void UpdateTopStocksTabStates(string selectedTab)
+        {
+            TopGainersTab.IsChecked = (selectedTab == "TopGainers");
+            TopLosersTab.IsChecked = (selectedTab == "TopLosers");
+            TopTurnoverTab.IsChecked = (selectedTab == "TopTurnover");
+            TopVolumeTab.IsChecked = (selectedTab == "TopVolume");
+            TopTransactionsTab.IsChecked = (selectedTab == "TopTransactions");
         }
 
         // Prevent the user from unchecking the currently active nav button
