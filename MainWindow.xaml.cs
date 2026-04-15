@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
@@ -148,6 +149,8 @@ namespace OpenPatro
             DateConverterButton.Unchecked += NavButton_Unchecked;
             BullionButton.Checked += BullionButton_Checked;
             BullionButton.Unchecked += NavButton_Unchecked;
+            ForexButton.Checked += ForexButton_Checked;
+            ForexButton.Unchecked += NavButton_Unchecked;
 
             CalendarButton.IsChecked = ViewModel.SelectedSection == ShellSection.Calendar;
             StockMarketButton.IsChecked = ViewModel.SelectedSection == ShellSection.StockMarket;
@@ -156,6 +159,7 @@ namespace OpenPatro
             ShubhaSaitButton.IsChecked = ViewModel.SelectedSection == ShellSection.ShubhaSait;
             DateConverterButton.IsChecked = ViewModel.SelectedSection == ShellSection.DateConverter;
             BullionButton.IsChecked = ViewModel.SelectedSection == ShellSection.Bullion;
+            ForexButton.IsChecked = ViewModel.SelectedSection == ShellSection.Forex;
             UpdateSectionVisibility();
             UpdateCalendarLayout();
             SyncCalendarNavigationSelections();
@@ -170,6 +174,15 @@ namespace OpenPatro
 
             AppWindow.Changed -= AppWindow_Changed;
             AppWindow.Changed += AppWindow_Changed;
+
+            // Redraw forex chart when history data arrives; update panel width on visibility change
+            ViewModel.Forex.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(OpenPatro.ViewModels.ForexViewModel.HasHistory))
+                    DrawForexChart();
+                else if (e.PropertyName == nameof(OpenPatro.ViewModels.ForexViewModel.IsHistoryPanelVisible))
+                    UpdateForexHistoryPanelWidth();
+            };
         }
 
         private void SidebarLogo_ImageFailed(object sender, ExceptionRoutedEventArgs e)
@@ -305,6 +318,14 @@ namespace OpenPatro
             ViewModel.SelectedSection = ShellSection.Bullion;
             UpdateSectionVisibility();
             await ViewModel.Bullion.InitializeAsync();
+        }
+
+        private async void ForexButton_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressNavCheckedEvents) return;
+            ViewModel.SelectedSection = ShellSection.Forex;
+            UpdateSectionVisibility();
+            await ViewModel.Forex.InitializeAsync();
         }
 
         // ── Top Stocks Tab Handlers ──
@@ -561,6 +582,7 @@ namespace OpenPatro
             ShubhaSaitSection.Visibility = ViewModel.IsShubhaSaitVisible ? Visibility.Visible : Visibility.Collapsed;
             DateConverterSection.Visibility = ViewModel.IsDateConverterVisible ? Visibility.Visible : Visibility.Collapsed;
             BullionSection.Visibility = ViewModel.IsBullionVisible ? Visibility.Visible : Visibility.Collapsed;
+            ForexSection.Visibility = ViewModel.IsForexVisible ? Visibility.Visible : Visibility.Collapsed;
 
             var activeButton = ViewModel.SelectedSection switch
             {
@@ -570,6 +592,7 @@ namespace OpenPatro
                 ShellSection.ShubhaSait => ShubhaSaitButton,
                 ShellSection.DateConverter => DateConverterButton,
                 ShellSection.Bullion => BullionButton,
+                ShellSection.Forex => ForexButton,
                 _ => CalendarButton
             };
 
@@ -582,6 +605,7 @@ namespace OpenPatro
             ShubhaSaitButton.IsChecked = ReferenceEquals(activeButton, ShubhaSaitButton);
             DateConverterButton.IsChecked = ReferenceEquals(activeButton, DateConverterButton);
             BullionButton.IsChecked = ReferenceEquals(activeButton, BullionButton);
+            ForexButton.IsChecked = ReferenceEquals(activeButton, ForexButton);
             SettingsButton.IsChecked = ReferenceEquals(activeButton, SettingsButton);
             _suppressNavCheckedEvents = false;
         }
@@ -1426,5 +1450,139 @@ namespace OpenPatro
         public Visibility BoolToVisibility(bool value) => value ? Visibility.Visible : Visibility.Collapsed;
 
         public Visibility StringToVisibility(string value) => string.IsNullOrEmpty(value) ? Visibility.Collapsed : Visibility.Visible;
+
+        // ── Forex row interaction ──
+
+        private void ForexRow_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Border border)
+                border.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SubtleFillColorSecondaryBrush"];
+        }
+
+        private void ForexRow_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Border border)
+                border.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        }
+
+        private void ForexRow_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is Border border && border.Tag is OpenPatro.ViewModels.ForexRateRowViewModel row)
+            {
+                ViewModel.Forex.SelectCurrencyCommand.Execute(row);
+                UpdateForexHistoryPanelWidth();
+            }
+        }
+
+        private void UpdateForexHistoryPanelWidth()
+        {
+            if (ForexSection is null || ForexSection.ColumnDefinitions.Count < 2) return;
+            var col = ForexSection.ColumnDefinitions[1];
+            col.Width = ViewModel.Forex.IsHistoryPanelVisible
+                ? new GridLength(340)
+                : new GridLength(0);
+        }
+
+        // ── Forex chart drawing ──
+
+        private void ForexChartCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            DrawForexChart();
+        }
+
+        internal void DrawForexChart()
+        {
+            if (ForexChartCanvas is null) return;
+            ForexChartCanvas.Children.Clear();
+
+            var points = ViewModel.Forex.ChartPoints;
+            if (points.Count < 2) return;
+
+            var canvasWidth = ForexChartCanvas.ActualWidth;
+            var canvasHeight = ForexChartCanvas.ActualHeight;
+            if (canvasWidth <= 0 || canvasHeight <= 0) return;
+
+            var values = points.Select(p => (double)p.Buying).ToList();
+            var minVal = values.Min();
+            var maxVal = values.Max();
+            var range = maxVal - minVal;
+            if (range == 0) range = 1;
+
+            const double padTop = 10;
+            const double padBottom = 10;
+            var drawHeight = canvasHeight - padTop - padBottom;
+
+            var polyPoints = new Windows.Foundation.Point[values.Count];
+            for (int i = 0; i < values.Count; i++)
+            {
+                var x = (canvasWidth / (values.Count - 1)) * i;
+                var y = padTop + drawHeight * (1.0 - (values[i] - minVal) / range);
+                polyPoints[i] = new Windows.Foundation.Point(x, y);
+            }
+
+            // Filled area under the line
+            var fillFigure = new Microsoft.UI.Xaml.Media.PathFigure
+            {
+                StartPoint = new Windows.Foundation.Point(0, canvasHeight)
+            };
+            fillFigure.Segments.Add(new Microsoft.UI.Xaml.Media.LineSegment { Point = polyPoints[0] });
+            foreach (var pt in polyPoints.Skip(1))
+                fillFigure.Segments.Add(new Microsoft.UI.Xaml.Media.LineSegment { Point = pt });
+            fillFigure.Segments.Add(new Microsoft.UI.Xaml.Media.LineSegment
+                { Point = new Windows.Foundation.Point(canvasWidth, canvasHeight) });
+            fillFigure.IsClosed = true;
+
+            var fillGeometry = new Microsoft.UI.Xaml.Media.PathGeometry();
+            fillGeometry.Figures.Add(fillFigure);
+
+            var fillPath = new Microsoft.UI.Xaml.Shapes.Path
+            {
+                Data = fillGeometry,
+                Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Microsoft.UI.ColorHelper.FromArgb(30, 59, 130, 246))
+            };
+            ForexChartCanvas.Children.Add(fillPath);
+
+            // Line
+            var polyline = new Microsoft.UI.Xaml.Shapes.Polyline
+            {
+                Stroke = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Microsoft.UI.ColorHelper.FromArgb(255, 59, 130, 246)),
+                StrokeThickness = 2,
+                StrokeLineJoin = Microsoft.UI.Xaml.Media.PenLineJoin.Round
+            };
+            foreach (var pt in polyPoints)
+                polyline.Points.Add(pt);
+            ForexChartCanvas.Children.Add(polyline);
+
+            // Dot at latest value
+            var lastPt = polyPoints[^1];
+            var dot = new Microsoft.UI.Xaml.Shapes.Ellipse
+            {
+                Width = 8, Height = 8,
+                Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Microsoft.UI.ColorHelper.FromArgb(255, 59, 130, 246))
+            };
+            Microsoft.UI.Xaml.Controls.Canvas.SetLeft(dot, lastPt.X - 4);
+            Microsoft.UI.Xaml.Controls.Canvas.SetTop(dot, lastPt.Y - 4);
+            ForexChartCanvas.Children.Add(dot);
+
+            // Date labels
+            if (ForexChartDateStart is not null && points.Count > 0)
+                ForexChartDateStart.Text = FormatChartDate(points[0].Date);
+            if (ForexChartDateMid is not null && points.Count > 1)
+                ForexChartDateMid.Text = FormatChartDate(points[points.Count / 2].Date);
+            if (ForexChartDateEnd is not null && points.Count > 0)
+                ForexChartDateEnd.Text = FormatChartDate(points[^1].Date);
+        }
+
+        private static string FormatChartDate(string raw)
+        {
+            if (System.DateOnly.TryParseExact(raw, "yyyy-MM-dd",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var d))
+                return d.ToString("MMM d", System.Globalization.CultureInfo.InvariantCulture);
+            return raw;
+        }
     }
 }

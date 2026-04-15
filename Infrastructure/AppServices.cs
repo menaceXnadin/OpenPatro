@@ -18,7 +18,8 @@ public sealed class AppServices
         BundledCalendarSeedService bundledSeed,
         NepaliPatroApiClient nepaliPatroApi,
         WindowBoundsService windowBounds,
-        BullionClient bullion)
+        BullionClient bullion,
+        ForexClient forex)
     {
         Paths = paths;
         Clock = clock;
@@ -33,6 +34,7 @@ public sealed class AppServices
         NepaliPatroApi = nepaliPatroApi;
         WindowBounds = windowBounds;
         Bullion = bullion;
+        Forex = forex;
     }
 
     public ApplicationPaths Paths { get; }
@@ -61,6 +63,8 @@ public sealed class AppServices
 
     public BullionClient Bullion { get; }
 
+    public ForexClient Forex { get; }
+
     public static async Task<AppServices> CreateAsync()
     {
         var paths = ApplicationPaths.Create();
@@ -80,7 +84,8 @@ public sealed class AppServices
         var nepaliPatroApi = new NepaliPatroApiClient();
         var windowBounds = new WindowBoundsService(userRepository);
         var bullion = new BullionClient();
+        var forex = new ForexClient();
 
-        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, shareHubNepse, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi, windowBounds, bullion);
+        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, shareHubNepse, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi, windowBounds, bullion, forex);
     }
 }

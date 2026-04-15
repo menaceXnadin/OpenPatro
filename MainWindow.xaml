@@ -146,6 +146,11 @@
                               ToolTipService.ToolTip="सुन/चाँदी मूल्य (Gold/Silver Prices)">
                     <FontIcon Glyph="&#xE8EC;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                 </ToggleButton>
+                <ToggleButton x:Name="ForexButton"
+                              Style="{StaticResource RailButtonStyle}"
+                              ToolTipService.ToolTip="विदेशी मुद्रा (Forex Rates)">
+                    <FontIcon Glyph="&#xE8C7;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                </ToggleButton>
                 <ToggleButton x:Name="SettingsButton"
                               Style="{StaticResource RailButtonStyle}">
                     <FontIcon Glyph="&#xE713;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
@@ -1864,6 +1869,251 @@
 
                     </StackPanel>
                 </ScrollViewer>
+            </Grid>
+            <!-- ═══════════════════════════════════════════════════════════
+                 FOREX SECTION  (Foreign Exchange Rates)
+                 ═══════════════════════════════════════════════════════════ -->
+            <Grid x:Name="ForexSection"
+                  Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="0" x:Name="HistoryPanelColumn" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left: rates table -->
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Header -->
+                    <Grid Margin="0,0,0,20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="विदेशी मुद्रा दर"
+                                       FontFamily="{StaticResource AppNepaliFontFamily}"
+                                       FontSize="32" FontWeight="SemiBold" CharacterSpacing="20" />
+                            <TextBlock Text="{x:Bind ViewModel.Forex.RatesDate, Mode=OneWay}"
+                                       Opacity="0.52" FontSize="13" Margin="1,2,0,0" CharacterSpacing="40" />
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Command="{x:Bind ViewModel.Forex.RefreshCommand, Mode=OneWay}"
+                                Width="36" Height="36" Padding="0" CornerRadius="18"
+                                Background="Transparent" BorderThickness="1"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                ToolTipService.ToolTip="Refresh">
+                            <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                        </Button>
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Spacing="12" Margin="0,0,16,0">
+
+                            <!-- Loading / Error -->
+                            <ProgressRing IsActive="{x:Bind ViewModel.Forex.IsBusy, Mode=OneWay}"
+                                          Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.IsBusy), Mode=OneWay}"
+                                          Width="32" Height="32" HorizontalAlignment="Left" />
+                            <TextBlock Text="{x:Bind ViewModel.Forex.ErrorMessage, Mode=OneWay}"
+                                       Visibility="{x:Bind StringToVisibility(ViewModel.Forex.ErrorMessage), Mode=OneWay}"
+                                       Foreground="#FF6B6B" TextWrapping="Wrap" />
+
+                            <!-- Hint text -->
+                            <TextBlock Text="Tap any currency to see 30-day trend"
+                                       Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasData), Mode=OneWay}"
+                                       FontSize="12" Opacity="0.45" Margin="0,0,0,4" />
+
+                            <!-- Rates table -->
+                            <Border Background="{ThemeResource LayerFillColorAltBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="16" Padding="0">
+                                <StackPanel>
+                                    <!-- Table header -->
+                                    <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                            CornerRadius="16,16,0,0" Padding="16,12">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="40" />
+                                                <ColumnDefinition Width="60" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="80" />
+                                                <ColumnDefinition Width="90" />
+                                                <ColumnDefinition Width="90" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="" FontSize="12" FontWeight="SemiBold" Opacity="0.6" />
+                                            <TextBlock Grid.Column="1" Text="Code" FontSize="12" FontWeight="SemiBold" Opacity="0.6" />
+                                            <TextBlock Grid.Column="2" Text="Currency" FontSize="12" FontWeight="SemiBold" Opacity="0.6" />
+                                            <TextBlock Grid.Column="3" Text="Unit" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
+                                            <TextBlock Grid.Column="4" Text="Buying (NPR)" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
+                                            <TextBlock Grid.Column="5" Text="Selling (NPR)" FontSize="12" FontWeight="SemiBold" Opacity="0.6" HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Rows -->
+                                    <ItemsControl ItemsSource="{x:Bind ViewModel.Forex.Rates, Mode=OneWay}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="viewmodels:ForexRateRowViewModel">
+                                                <Border Padding="16,11"
+                                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                        BorderThickness="0,0,0,1"
+                                                        Background="Transparent"
+                                                        PointerEntered="ForexRow_PointerEntered"
+                                                        PointerExited="ForexRow_PointerExited"
+                                                        PointerPressed="ForexRow_PointerPressed"
+                                                        Tag="{x:Bind}">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="40" />
+                                                            <ColumnDefinition Width="60" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="80" />
+                                                            <ColumnDefinition Width="90" />
+                                                            <ColumnDefinition Width="90" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0" Text="{x:Bind Flag}" FontSize="18" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="1" Text="{x:Bind Code}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="2" Text="{x:Bind Currency}" FontSize="13" Opacity="0.8" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="3" Text="{x:Bind UnitLabel}" FontSize="12" Opacity="0.55" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="4" Text="{x:Bind BuyingText}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                        <TextBlock Grid.Column="5" Text="{x:Bind SellingText}" FontSize="13" Opacity="0.75" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+
+                <!-- Right: history panel -->
+                <Border Grid.Column="1"
+                        x:Name="ForexHistoryPanel"
+                        Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.IsHistoryPanelVisible), Mode=OneWay}"
+                        Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1,0,0,0"
+                        Padding="20,0,0,0"
+                        Margin="20,0,0,0">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Spacing="16" Margin="0,0,16,16">
+
+                            <!-- Panel header -->
+                            <Grid Margin="0,20,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{x:Bind ViewModel.Forex.SelectedCurrencyLabel, Mode=OneWay}"
+                                               FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <TextBlock Text="30-day buying rate trend"
+                                               FontSize="12" Opacity="0.5" Margin="0,2,0,0" />
+                                </StackPanel>
+                                <Button Grid.Column="1"
+                                        Command="{x:Bind ViewModel.Forex.CloseHistoryCommand, Mode=OneWay}"
+                                        Width="32" Height="32" Padding="0" CornerRadius="16"
+                                        Background="Transparent" BorderThickness="0"
+                                        VerticalAlignment="Top">
+                                    <FontIcon Glyph="&#xE711;" FontSize="12" />
+                                </Button>
+                            </Grid>
+
+                            <!-- History loading / error -->
+                            <ProgressRing IsActive="{x:Bind ViewModel.Forex.IsHistoryBusy, Mode=OneWay}"
+                                          Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.IsHistoryBusy), Mode=OneWay}"
+                                          Width="28" Height="28" HorizontalAlignment="Left" />
+                            <TextBlock Text="{x:Bind ViewModel.Forex.HistoryError, Mode=OneWay}"
+                                       Visibility="{x:Bind StringToVisibility(ViewModel.Forex.HistoryError), Mode=OneWay}"
+                                       Foreground="#FF6B6B" TextWrapping="Wrap" FontSize="13" />
+
+                            <!-- Stats row -->
+                            <Grid Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasHistory), Mode=OneWay}"
+                                  ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                        CornerRadius="10" Padding="12,10">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="30d Low" FontSize="11" Opacity="0.5" />
+                                        <TextBlock Text="{x:Bind ViewModel.Forex.HistoryMin, Mode=OneWay}"
+                                                   FontSize="15" FontWeight="SemiBold" Foreground="#22C55E" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="1" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                        CornerRadius="10" Padding="12,10">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="30d High" FontSize="11" Opacity="0.5" />
+                                        <TextBlock Text="{x:Bind ViewModel.Forex.HistoryMax, Mode=OneWay}"
+                                                   FontSize="15" FontWeight="SemiBold" Foreground="#EF4444" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Column="2" Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                        CornerRadius="10" Padding="12,10">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="30d Avg" FontSize="11" Opacity="0.5" />
+                                        <TextBlock Text="{x:Bind ViewModel.Forex.HistoryAvg, Mode=OneWay}"
+                                                   FontSize="15" FontWeight="SemiBold" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+
+                            <!-- Change badge -->
+                            <StackPanel Orientation="Horizontal" Spacing="6"
+                                        Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasHistory), Mode=OneWay}">
+                                <TextBlock Text="30d change:"
+                                           FontSize="13" Opacity="0.6" VerticalAlignment="Center" />
+                                <TextBlock Text="?"
+                                           FontSize="12" Foreground="#22C55E" VerticalAlignment="Center"
+                                           Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HistoryChangeUp), Mode=OneWay}" />
+                                <TextBlock Text="?"
+                                           FontSize="12" Foreground="#EF4444" VerticalAlignment="Center"
+                                           Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HistoryChangeDown), Mode=OneWay}" />
+                                <TextBlock Text="{x:Bind ViewModel.Forex.HistoryChange, Mode=OneWay}"
+                                           FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <!-- Chart canvas -->
+                            <Border Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasHistory), Mode=OneWay}"
+                                    Background="{ThemeResource LayerFillColorAltBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1" CornerRadius="12" Padding="12">
+                                <Canvas x:Name="ForexChartCanvas"
+                                        Height="160"
+                                        SizeChanged="ForexChartCanvas_SizeChanged" />
+                            </Border>
+
+                            <!-- Date labels under chart -->
+                            <Grid Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasHistory), Mode=OneWay}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="ForexChartDateStart"
+                                           Grid.Column="0" FontSize="10" Opacity="0.45" />
+                                <TextBlock x:Name="ForexChartDateMid"
+                                           Grid.Column="1" FontSize="10" Opacity="0.45"
+                                           HorizontalAlignment="Center" />
+                                <TextBlock x:Name="ForexChartDateEnd"
+                                           Grid.Column="2" FontSize="10" Opacity="0.45"
+                                           HorizontalAlignment="Right" />
+                            </Grid>
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
             </Grid>
 
         </Grid>

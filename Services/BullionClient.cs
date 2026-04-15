@@ -28,7 +28,7 @@ public sealed class BullionClient
     /// Fetches bullion prices starting from the given AD date.
     /// The API returns all entries from that date up to today.
     /// </summary>
-    /// <param name="fromDate">The start date (AD). Defaults to 30 days ago if not specified.</param>
+    /// <param name="fromDate">The start date (AD). Defaults to 30 days before today if not specified.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<BullionResponse?> FetchAsync(
         DateOnly? fromDate = null,
@@ -49,12 +49,11 @@ public sealed class BullionClient
     }
 
     /// <summary>
-    /// Returns the default from-date that the original site uses (2026-3-16).
-    /// This gives ~30 days of history which is enough for the chart/table.
+    /// Returns a from-date 30 days before today, so the table always shows
+    /// a rolling ~30-day window regardless of when the app is run.
     /// </summary>
     private static DateOnly GetDefaultFromDate()
     {
-        // Mirror the original site's default: 2026-3-16
-        return new DateOnly(2026, 3, 16);
+        return DateOnly.FromDateTime(DateTime.Today.AddDays(-30));
     }
 }

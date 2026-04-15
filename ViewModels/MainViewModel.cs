@@ -17,6 +17,7 @@ public sealed class MainViewModel : BindableBase
         ShubhaSait = new ShubhaSaitViewModel(services);
         DateConverter = new DateConverterViewModel(services);
         Bullion = new BullionViewModel(services);
+        Forex = new ForexViewModel(services);
     }
 
     public CalendarViewModel Calendar { get; }
@@ -34,6 +35,8 @@ public sealed class MainViewModel : BindableBase
     public DateConverterViewModel DateConverter { get; }
 
     public BullionViewModel Bullion { get; }
+
+    public ForexViewModel Forex { get; }
 
     public ShellSection SelectedSection
     {
@@ -55,6 +58,7 @@ public sealed class MainViewModel : BindableBase
                 RaisePropertyChanged(nameof(IsShubhaSaitVisible));
                 RaisePropertyChanged(nameof(IsDateConverterVisible));
                 RaisePropertyChanged(nameof(IsBullionVisible));
+                RaisePropertyChanged(nameof(IsForexVisible));
             }
         }
     }
@@ -75,6 +79,8 @@ public sealed class MainViewModel : BindableBase
 
     public bool IsBullionVisible => SelectedSection == ShellSection.Bullion;
 
+    public bool IsForexVisible => SelectedSection == ShellSection.Forex;
+
     public async Task InitializeAsync()
     {
         SelectedSection = ShellSection.Calendar;
@@ -88,6 +94,7 @@ public sealed class MainViewModel : BindableBase
         _ = SafeInitializeAsync(ShubhaSait);
         _ = SafeInitializeAsync(StockMarket);
         _ = SafeInitializeAsync(Bullion);
+        _ = SafeInitializeAsync(Forex);
     }
 
     public async Task SelectCalendarDateAsync(int year, int month, int day)
@@ -112,6 +119,11 @@ public sealed class MainViewModel : BindableBase
     }
 
     private static async Task SafeInitializeAsync(BullionViewModel vm)
+    {
+        try { await vm.InitializeAsync(); } catch { /* Network failure during pre-fetch is OK */ }
+    }
+
+    private static async Task SafeInitializeAsync(ForexViewModel vm)
     {
         try { await vm.InitializeAsync(); } catch { /* Network failure during pre-fetch is OK */ }
     }

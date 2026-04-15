@@ -9,5 +9,6 @@ public enum ShellSection
     Rashifal,
     ShubhaSait,
     DateConverter,
-    Bullion
+    Bullion,
+    Forex
 }
