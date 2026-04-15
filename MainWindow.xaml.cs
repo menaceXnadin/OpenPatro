@@ -20,6 +20,7 @@ namespace OpenPatro
         // ── Win32 / DWM interop constants ──
         private const int GwlpWndProc = -4;
         private const uint WmGetMinMaxInfo = 0x0024;
+        private const uint WmTimeChange = 0x001E;
         private const int DwmaUseImmersiveDarkModeBefore20H1 = 19;
         private const int DwmaUseImmersiveDarkMode = 20;
 
@@ -942,6 +943,14 @@ namespace OpenPatro
                 Marshal.StructureToPtr(minMaxInfo, lParam, false);
 
                 return IntPtr.Zero;
+            }
+
+            if (msg == WmTimeChange)
+            {
+                // The system clock was adjusted (NTP sync, user change, DST, etc.).
+                // Nudge the date watcher immediately instead of waiting for the next
+                // 1-minute poll tick.
+                ((App)Application.Current).DateChangeWatcher?.OnSystemTimeChanged();
             }
 
             if (_previousWndProc != IntPtr.Zero)

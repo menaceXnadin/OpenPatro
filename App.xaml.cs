@@ -26,7 +26,7 @@ namespace OpenPatro
         private MenuFlyoutItem? _todayMenuItem;
         private ToggleMenuFlyoutItem? _startupMenuItem;
         private bool _allowWindowClose;
-        private IDisposable? _midnightSubscription;
+        private DateChangeWatcher? _dateChangeSubscription;
         private Microsoft.UI.Dispatching.DispatcherQueue? _uiDispatcherQueue;
         private CalendarViewModel? _trayCalendarViewModel;
         private DispatcherKeepaliveWindow? _keepaliveWindow;
@@ -34,11 +34,13 @@ namespace OpenPatro
         private DateTimeOffset _trayToggleStartedAt;
         private DateTimeOffset _lastTrayDateNotificationAt;
         private bool _calendarResetInProgress;
+        private Microsoft.UI.Dispatching.DispatcherQueueTimer? _trayRefreshTimer;
 
         private static readonly TimeSpan TrayDateNotificationCooldown = TimeSpan.FromSeconds(2);
 
         public AppServices Services { get; private set; } = null!;
         public MainViewModel MainViewModel { get; private set; } = null!;
+        public DateChangeWatcher? DateChangeWatcher => _dateChangeSubscription;
 
         public App()
         {
@@ -269,24 +271,24 @@ namespace OpenPatro
 
             try
             {
-                _midnightSubscription = Services.Clock.ScheduleDailyMidnightCallback(() =>
+                _dateChangeSubscription = Services.Clock.WatchForDateChange(() =>
                 {
                     var dispatcher = _uiDispatcherQueue;
                     if (dispatcher is null)
                     {
-                        Log("MidnightTick: UI dispatcher unavailable");
+                        Log("DateChange: UI dispatcher unavailable");
                         return;
                     }
 
                     if (dispatcher.HasThreadAccess)
                     {
-                        _ = HandleMidnightTickAsync();
+                        _ = HandleDateChangeAsync();
                         return;
                     }
 
-                    if (!dispatcher.TryEnqueue(() => _ = HandleMidnightTickAsync()))
+                    if (!dispatcher.TryEnqueue(() => _ = HandleDateChangeAsync()))
                     {
-                        Log("MidnightTick: failed to enqueue on UI dispatcher");
+                        Log("DateChange: failed to enqueue on UI dispatcher");
                     }
                 });
 
@@ -299,7 +301,7 @@ namespace OpenPatro
             }
         }
 
-        private async Task HandleMidnightTickAsync()
+        private async Task HandleDateChangeAsync()
         {
             try
             {
@@ -311,7 +313,7 @@ namespace OpenPatro
             }
             catch (Exception ex)
             {
-                Log($"MidnightTick calendar refresh FAILED: {ex}");
+                Log($"DateChange: calendar refresh FAILED: {ex}");
             }
 
             try
@@ -320,7 +322,7 @@ namespace OpenPatro
             }
             catch (Exception ex)
             {
-                Log($"MidnightTick sync FAILED: {ex}");
+                Log($"DateChange: sync FAILED: {ex}");
             }
 
             try
@@ -329,7 +331,7 @@ namespace OpenPatro
             }
             catch (Exception ex)
             {
-                Log($"MidnightTick tray refresh FAILED: {ex}");
+                Log($"DateChange: tray refresh FAILED: {ex}");
             }
         }
 
@@ -379,8 +381,6 @@ namespace OpenPatro
                 }
 
                 _trayIcon.ToolTipText = today.BsFullDate;
-                // Passing null for monthText uses the day-only path, filling the full 256px icon.
-                _trayIcon.Icon = TrayIconGlyphFactory.CreateIcon(today.BsDayText, null, today.IsHoliday);
                 _trayIcon.Icon = TrayIconGlyphFactory.CreateIcon(today.BsDayText, today.IsHoliday);
 
                 if (_todayMenuItem is not null)
@@ -422,7 +422,9 @@ namespace OpenPatro
         public void ExitApplication()
         {
             _allowWindowClose = true;
-            _midnightSubscription?.Dispose();
+            _dateChangeSubscription?.Dispose();
+            _trayRefreshTimer?.Stop();
+            _trayRefreshTimer = null;
 
             if (_trayPopupWindow is not null)
             {
@@ -453,6 +455,22 @@ namespace OpenPatro
             }
 
             return false;
+        }
+
+        private void EnsureTrayAutoRefreshTimerStarted()
+        {
+            var dispatcher = _uiDispatcherQueue;
+            if (dispatcher is null || _trayRefreshTimer is not null)
+            {
+                return;
+            }
+
+            var timer = dispatcher.CreateTimer();
+            timer.Interval = TimeSpan.FromMinutes(1);
+            timer.IsRepeating = true;
+            timer.Tick += (_, _) => _ = RefreshTrayPresentationAsync();
+            timer.Start();
+            _trayRefreshTimer = timer;
         }
 
         private static bool IsStartupLaunch()
@@ -561,6 +579,11 @@ namespace OpenPatro
             try
             {
                 var now = DateTimeOffset.UtcNow;
+
+                // Ensure tray icon + tooltip reflect the current date even if a
+                // midnight refresh was missed (e.g. system sleep/resume).
+                await RefreshTrayPresentationAsync();
+
                 if (now - _lastTrayDateNotificationAt < TrayDateNotificationCooldown)
                 {
                     return;
