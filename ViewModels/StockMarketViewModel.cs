@@ -375,12 +375,25 @@ public sealed class StockMarketViewModel : BindableBase
                 ? FormatCurrency(s.Value)
                 : FormatCount(s.Value))));
 
-        TotalTurnover = FormatLargeNumber(summary.FirstOrDefault(s => s.Name.Contains("Turnover", StringComparison.OrdinalIgnoreCase))?.Value ?? 0);
-        TotalTransactions = FormatLargeNumber(summary.FirstOrDefault(s => s.Name.Contains("Transactions", StringComparison.OrdinalIgnoreCase))?.Value ?? 0);
-        TotalTradedShares = FormatLargeNumber(summary.FirstOrDefault(s => s.Name.Contains("Traded Shares", StringComparison.OrdinalIgnoreCase))?.Value ?? 0);
-        ScriptsTraded = FormatCount(summary.FirstOrDefault(s => s.Name.Contains("Scrips Traded", StringComparison.OrdinalIgnoreCase))?.Value ?? 0);
-        MarketCap = FormatLargeNumber(summary.FirstOrDefault(s => s.Name.Contains("Market Capitalization", StringComparison.OrdinalIgnoreCase) && !s.Name.Contains("Float", StringComparison.OrdinalIgnoreCase))?.Value ?? 0);
-        FloatMarketCap = FormatLargeNumber(summary.FirstOrDefault(s => s.Name.Contains("Float Market Capitalization", StringComparison.OrdinalIgnoreCase))?.Value ?? 0);
+        var turnover = TryGetSummaryValue(summary, key => key.Contains("turnover", StringComparison.Ordinal));
+        var totalTransactions = TryGetSummaryValue(summary, key => key.Contains("transactions", StringComparison.Ordinal));
+        var tradedShares = TryGetSummaryValue(summary, key => key.Contains("tradedshares", StringComparison.Ordinal));
+        var scriptsTraded = TryGetSummaryValue(summary, key =>
+            key.Contains("traded", StringComparison.Ordinal) &&
+            (key.Contains("scrip", StringComparison.Ordinal) || key.Contains("script", StringComparison.Ordinal)));
+        var marketCap = TryGetSummaryValue(summary, key =>
+            (key.Contains("marketcap", StringComparison.Ordinal) || key.Contains("marketcapital", StringComparison.Ordinal)) &&
+            !key.Contains("float", StringComparison.Ordinal));
+        var floatMarketCap = TryGetSummaryValue(summary, key =>
+            key.Contains("float", StringComparison.Ordinal) &&
+            (key.Contains("marketcap", StringComparison.Ordinal) || key.Contains("marketcapital", StringComparison.Ordinal)));
+
+        TotalTurnover = FormatLargeNumber(turnover);
+        TotalTransactions = FormatLargeNumber(totalTransactions);
+        TotalTradedShares = FormatLargeNumber(tradedShares);
+        ScriptsTraded = FormatCount(scriptsTraded);
+        MarketCap = FormatLargeNumber(marketCap);
+        FloatMarketCap = FormatLargeNumber(floatMarketCap);
 
         var stockSummary = response.StockSummary;
         if (stockSummary is not null)
@@ -648,6 +661,45 @@ public sealed class StockMarketViewModel : BindableBase
             : 0;
     }
 
+    private static decimal? TryGetSummaryValue(IEnumerable<MarketSummaryEntry> summary, Func<string, bool> predicate)
+    {
+        foreach (var entry in summary)
+        {
+            if (entry is null)
+            {
+                continue;
+            }
+
+            var normalizedName = NormalizeSummaryKey(entry.Name);
+            if (predicate(normalizedName))
+            {
+                return entry.Value;
+            }
+        }
+
+        return null;
+    }
+
+    private static string NormalizeSummaryKey(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return string.Empty;
+        }
+
+        Span<char> buffer = stackalloc char[input.Length];
+        var index = 0;
+        foreach (var ch in input)
+        {
+            if (char.IsLetterOrDigit(ch))
+            {
+                buffer[index++] = char.ToLowerInvariant(ch);
+            }
+        }
+
+        return index == 0 ? string.Empty : new string(buffer[..index]);
+    }
+
     private static string FormatCurrency(decimal? value)
     {
         return value.HasValue
@@ -670,6 +722,13 @@ public sealed class StockMarketViewModel : BindableBase
     private static string FormatCount(decimal value)
     {
         return value.ToString("N0", CultureInfo.InvariantCulture);
+    }
+
+    private static string FormatLargeNumber(decimal? value)
+    {
+        return value.HasValue
+            ? value.Value.ToString("N0", CultureInfo.InvariantCulture)
+            : "--";
     }
 
     private static string FormatLargeNumber(decimal value)

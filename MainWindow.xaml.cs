@@ -146,6 +146,8 @@ namespace OpenPatro
             ShubhaSaitButton.Unchecked += NavButton_Unchecked;
             DateConverterButton.Checked += DateConverterButton_Checked;
             DateConverterButton.Unchecked += NavButton_Unchecked;
+            BullionButton.Checked += BullionButton_Checked;
+            BullionButton.Unchecked += NavButton_Unchecked;
 
             CalendarButton.IsChecked = ViewModel.SelectedSection == ShellSection.Calendar;
             StockMarketButton.IsChecked = ViewModel.SelectedSection == ShellSection.StockMarket;
@@ -153,6 +155,7 @@ namespace OpenPatro
             RashifalButton.IsChecked = ViewModel.SelectedSection == ShellSection.Rashifal;
             ShubhaSaitButton.IsChecked = ViewModel.SelectedSection == ShellSection.ShubhaSait;
             DateConverterButton.IsChecked = ViewModel.SelectedSection == ShellSection.DateConverter;
+            BullionButton.IsChecked = ViewModel.SelectedSection == ShellSection.Bullion;
             UpdateSectionVisibility();
             UpdateCalendarLayout();
             SyncCalendarNavigationSelections();
@@ -294,6 +297,14 @@ namespace OpenPatro
             ViewModel.SelectedSection = ShellSection.DateConverter;
             UpdateSectionVisibility();
             SyncDateConverterInputParts();
+        }
+
+        private async void BullionButton_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressNavCheckedEvents) return;
+            ViewModel.SelectedSection = ShellSection.Bullion;
+            UpdateSectionVisibility();
+            await ViewModel.Bullion.InitializeAsync();
         }
 
         // ── Top Stocks Tab Handlers ──
@@ -549,6 +560,7 @@ namespace OpenPatro
             RashifalSection.Visibility = ViewModel.IsRashifalVisible ? Visibility.Visible : Visibility.Collapsed;
             ShubhaSaitSection.Visibility = ViewModel.IsShubhaSaitVisible ? Visibility.Visible : Visibility.Collapsed;
             DateConverterSection.Visibility = ViewModel.IsDateConverterVisible ? Visibility.Visible : Visibility.Collapsed;
+            BullionSection.Visibility = ViewModel.IsBullionVisible ? Visibility.Visible : Visibility.Collapsed;
 
             var activeButton = ViewModel.SelectedSection switch
             {
@@ -557,6 +569,7 @@ namespace OpenPatro
                 ShellSection.Rashifal => RashifalButton,
                 ShellSection.ShubhaSait => ShubhaSaitButton,
                 ShellSection.DateConverter => DateConverterButton,
+                ShellSection.Bullion => BullionButton,
                 _ => CalendarButton
             };
 
@@ -568,6 +581,7 @@ namespace OpenPatro
             RashifalButton.IsChecked = ReferenceEquals(activeButton, RashifalButton);
             ShubhaSaitButton.IsChecked = ReferenceEquals(activeButton, ShubhaSaitButton);
             DateConverterButton.IsChecked = ReferenceEquals(activeButton, DateConverterButton);
+            BullionButton.IsChecked = ReferenceEquals(activeButton, BullionButton);
             SettingsButton.IsChecked = ReferenceEquals(activeButton, SettingsButton);
             _suppressNavCheckedEvents = false;
         }

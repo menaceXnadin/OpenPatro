@@ -17,7 +17,8 @@ public sealed class AppServices
         TrayNotificationService notifications,
         BundledCalendarSeedService bundledSeed,
         NepaliPatroApiClient nepaliPatroApi,
-        WindowBoundsService windowBounds)
+        WindowBoundsService windowBounds,
+        BullionClient bullion)
     {
         Paths = paths;
         Clock = clock;
@@ -31,6 +32,7 @@ public sealed class AppServices
         BundledSeed = bundledSeed;
         NepaliPatroApi = nepaliPatroApi;
         WindowBounds = windowBounds;
+        Bullion = bullion;
     }
 
     public ApplicationPaths Paths { get; }
@@ -57,6 +59,8 @@ public sealed class AppServices
 
     public WindowBoundsService WindowBounds { get; }
 
+    public BullionClient Bullion { get; }
+
     public static async Task<AppServices> CreateAsync()
     {
         var paths = ApplicationPaths.Create();
@@ -75,7 +79,8 @@ public sealed class AppServices
         var bundledSeed = new BundledCalendarSeedService(paths, parser);
         var nepaliPatroApi = new NepaliPatroApiClient();
         var windowBounds = new WindowBoundsService(userRepository);
+        var bullion = new BullionClient();
 
-        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, shareHubNepse, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi, windowBounds);
+        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, shareHubNepse, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi, windowBounds, bullion);
     }
 }

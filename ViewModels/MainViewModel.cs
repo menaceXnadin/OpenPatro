@@ -16,6 +16,7 @@ public sealed class MainViewModel : BindableBase
         Rashifal = new RashifalViewModel(services);
         ShubhaSait = new ShubhaSaitViewModel(services);
         DateConverter = new DateConverterViewModel(services);
+        Bullion = new BullionViewModel(services);
     }
 
     public CalendarViewModel Calendar { get; }
@@ -31,6 +32,8 @@ public sealed class MainViewModel : BindableBase
     public ShubhaSaitViewModel ShubhaSait { get; }
 
     public DateConverterViewModel DateConverter { get; }
+
+    public BullionViewModel Bullion { get; }
 
     public ShellSection SelectedSection
     {
@@ -51,6 +54,7 @@ public sealed class MainViewModel : BindableBase
                 RaisePropertyChanged(nameof(IsRashifalVisible));
                 RaisePropertyChanged(nameof(IsShubhaSaitVisible));
                 RaisePropertyChanged(nameof(IsDateConverterVisible));
+                RaisePropertyChanged(nameof(IsBullionVisible));
             }
         }
     }
@@ -69,6 +73,8 @@ public sealed class MainViewModel : BindableBase
 
     public bool IsDateConverterVisible => SelectedSection == ShellSection.DateConverter;
 
+    public bool IsBullionVisible => SelectedSection == ShellSection.Bullion;
+
     public async Task InitializeAsync()
     {
         SelectedSection = ShellSection.Calendar;
@@ -81,6 +87,7 @@ public sealed class MainViewModel : BindableBase
         _ = SafeInitializeAsync(Rashifal);
         _ = SafeInitializeAsync(ShubhaSait);
         _ = SafeInitializeAsync(StockMarket);
+        _ = SafeInitializeAsync(Bullion);
     }
 
     public async Task SelectCalendarDateAsync(int year, int month, int day)
@@ -100,6 +107,11 @@ public sealed class MainViewModel : BindableBase
     }
 
     private static async Task SafeInitializeAsync(StockMarketViewModel vm)
+    {
+        try { await vm.InitializeAsync(); } catch { /* Network failure during pre-fetch is OK */ }
+    }
+
+    private static async Task SafeInitializeAsync(BullionViewModel vm)
     {
         try { await vm.InitializeAsync(); } catch { /* Network failure during pre-fetch is OK */ }
     }

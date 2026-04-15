@@ -8,5 +8,6 @@ public enum ShellSection
     Settings,
     Rashifal,
     ShubhaSait,
-    DateConverter
+    DateConverter,
+    Bullion
 }

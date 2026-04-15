@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:OpenPatro"
     xmlns:infrastructure="using:OpenPatro.Infrastructure"
+    xmlns:viewmodels="using:OpenPatro.ViewModels"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
@@ -139,6 +140,11 @@
                               Style="{StaticResource RailButtonStyle}"
                               ToolTipService.ToolTip="मिति रूपान्तरण (Date Converter)">
                     <FontIcon Glyph="&#xE895;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                </ToggleButton>
+                <ToggleButton x:Name="BullionButton"
+                              Style="{StaticResource RailButtonStyle}"
+                              ToolTipService.ToolTip="सुन/चाँदी मूल्य (Gold/Silver Prices)">
+                    <FontIcon Glyph="&#xE8EC;" FontSize="18" Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                 </ToggleButton>
                 <ToggleButton x:Name="SettingsButton"
                               Style="{StaticResource RailButtonStyle}">
@@ -1531,6 +1537,331 @@
                                 </Grid>
                             </StackPanel>
                         </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 BULLION SECTION  (Gold / Silver Prices)
+                 ═══════════════════════════════════════════════════════════ -->
+            <Grid x:Name="BullionSection"
+                  Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Header -->
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="सुन / चाँदी मूल्य"
+                                   FontFamily="{StaticResource AppNepaliFontFamily}"
+                                   FontSize="32"
+                                   FontWeight="SemiBold"
+                                   CharacterSpacing="20" />
+                        <TextBlock Text="Gold / Silver Prices (NPR)"
+                                   Opacity="0.52"
+                                   FontSize="13"
+                                   Margin="1,2,0,0"
+                                   CharacterSpacing="40" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Command="{x:Bind ViewModel.Bullion.RefreshCommand, Mode=OneWay}"
+                            Width="36" Height="36" Padding="0"
+                            CornerRadius="18"
+                            Background="Transparent"
+                            BorderThickness="1"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            ToolTipService.ToolTip="Refresh">
+                        <FontIcon Glyph="&#xE72C;" FontSize="14" />
+                    </Button>
+                </Grid>
+
+                <ScrollViewer Grid.Row="1"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Spacing="16" Margin="0,0,16,0">
+
+                        <!-- Loading / Error -->
+                        <ProgressRing IsActive="{x:Bind ViewModel.Bullion.IsBusy, Mode=OneWay}"
+                                      Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.IsBusy), Mode=OneWay}"
+                                      Width="32" Height="32"
+                                      HorizontalAlignment="Left" />
+                        <TextBlock Text="{x:Bind ViewModel.Bullion.ErrorMessage, Mode=OneWay}"
+                                   Visibility="{x:Bind StringToVisibility(ViewModel.Bullion.ErrorMessage), Mode=OneWay}"
+                                   Foreground="#FF6B6B"
+                                   TextWrapping="Wrap" />
+
+                        <!-- ── Today's date badge ── -->
+                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
+                            <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                    CornerRadius="8" Padding="12,6">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE787;" FontSize="13" Opacity="0.6" />
+                                    <TextBlock Text="{x:Bind ViewModel.Bullion.TodayBsDate, Mode=OneWay}"
+                                               FontFamily="{StaticResource AppNepaliFontFamily}"
+                                               FontSize="13" FontWeight="SemiBold" />
+                                    <TextBlock Text="|" Opacity="0.3" FontSize="13" />
+                                    <TextBlock Text="{x:Bind ViewModel.Bullion.TodayAdDate, Mode=OneWay}"
+                                               FontSize="13" Opacity="0.7" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- ── Summary cards row ── -->
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Gold Hallmark card -->
+                            <Border Grid.Column="0"
+                                    Background="{ThemeResource LayerFillColorAltBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="16"
+                                    Padding="20,16">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="🥇" FontSize="16" />
+                                        <TextBlock Text="Hallmark Gold"
+                                                   FontSize="12" FontWeight="SemiBold"
+                                                   Opacity="0.6"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Text="{x:Bind ViewModel.Bullion.GoldHallmarkPerTola, Mode=OneWay}"
+                                               FontSize="22" FontWeight="Bold" />
+                                    <TextBlock Text="per tola"
+                                               FontSize="11" Opacity="0.5" />
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="▲"
+                                                   FontSize="11"
+                                                   Foreground="#22C55E"
+                                                   Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.GoldHallmarkUp), Mode=OneWay}" />
+                                        <TextBlock Text="▼"
+                                                   FontSize="11"
+                                                   Foreground="#EF4444"
+                                                   Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.GoldHallmarkDown), Mode=OneWay}" />
+                                        <TextBlock Text="{x:Bind ViewModel.Bullion.GoldHallmarkChange, Mode=OneWay}"
+                                                   FontSize="12"
+                                                   Opacity="0.7" />
+                                    </StackPanel>
+                                    <Border Height="1"
+                                            Background="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            Margin="0,4,0,4" />
+                                    <TextBlock Text="{x:Bind ViewModel.Bullion.GoldHallmarkPer10g, Mode=OneWay}"
+                                               FontSize="14" FontWeight="SemiBold" Opacity="0.8" />
+                                    <TextBlock Text="per 10g"
+                                               FontSize="11" Opacity="0.5" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Tejabi Gold card -->
+                            <Border Grid.Column="1"
+                                    Background="{ThemeResource LayerFillColorAltBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="16"
+                                    Padding="20,16">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="✨" FontSize="16" />
+                                        <TextBlock Text="Tejabi Gold"
+                                                   FontSize="12" FontWeight="SemiBold"
+                                                   Opacity="0.6"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Text="{x:Bind ViewModel.Bullion.GoldTejabiPerTola, Mode=OneWay}"
+                                               FontSize="22" FontWeight="Bold" />
+                                    <TextBlock Text="per tola"
+                                               FontSize="11" Opacity="0.5" />
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="▲"
+                                                   FontSize="11"
+                                                   Foreground="#22C55E"
+                                                   Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.GoldTejabiUp), Mode=OneWay}" />
+                                        <TextBlock Text="▼"
+                                                   FontSize="11"
+                                                   Foreground="#EF4444"
+                                                   Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.GoldTejabiDown), Mode=OneWay}" />
+                                        <TextBlock Text="{x:Bind ViewModel.Bullion.GoldTejabiChange, Mode=OneWay}"
+                                                   FontSize="12"
+                                                   Opacity="0.7" />
+                                    </StackPanel>
+                                    <Border Height="1"
+                                            Background="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            Margin="0,4,0,4" />
+                                    <TextBlock Text="{x:Bind ViewModel.Bullion.GoldTejabiPer10g, Mode=OneWay}"
+                                               FontSize="14" FontWeight="SemiBold" Opacity="0.8" />
+                                    <TextBlock Text="per 10g"
+                                               FontSize="11" Opacity="0.5" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Silver card -->
+                            <Border Grid.Column="2"
+                                    Background="{ThemeResource LayerFillColorAltBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="16"
+                                    Padding="20,16">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="🥈" FontSize="16" />
+                                        <TextBlock Text="Silver"
+                                                   FontSize="12" FontWeight="SemiBold"
+                                                   Opacity="0.6"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <TextBlock Text="{x:Bind ViewModel.Bullion.SilverPerTola, Mode=OneWay}"
+                                               FontSize="22" FontWeight="Bold" />
+                                    <TextBlock Text="per tola"
+                                               FontSize="11" Opacity="0.5" />
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="▲"
+                                                   FontSize="11"
+                                                   Foreground="#22C55E"
+                                                   Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.SilverUp), Mode=OneWay}" />
+                                        <TextBlock Text="▼"
+                                                   FontSize="11"
+                                                   Foreground="#EF4444"
+                                                   Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.SilverDown), Mode=OneWay}" />
+                                        <TextBlock Text="{x:Bind ViewModel.Bullion.SilverChange, Mode=OneWay}"
+                                                   FontSize="12"
+                                                   Opacity="0.7" />
+                                    </StackPanel>
+                                    <Border Height="1"
+                                            Background="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            Margin="0,4,0,4" />
+                                    <TextBlock Text="{x:Bind ViewModel.Bullion.SilverPer10g, Mode=OneWay}"
+                                               FontSize="14" FontWeight="SemiBold" Opacity="0.8" />
+                                    <TextBlock Text="per 10g"
+                                               FontSize="11" Opacity="0.5" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <!-- ── Historical price table ── -->
+                        <Border Background="{ThemeResource LayerFillColorAltBrush}"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="16"
+                                Padding="0">
+
+                            <!-- Table header -->
+                            <StackPanel>
+                                <Border Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                        CornerRadius="16,16,0,0"
+                                        Padding="16,12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="AD Date"
+                                                   FontSize="12" FontWeight="SemiBold" Opacity="0.6" />
+                                        <TextBlock Grid.Column="1" Text="BS Date"
+                                                   FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                   FontSize="12" FontWeight="SemiBold" Opacity="0.6" />
+                                        <TextBlock Grid.Column="2" Text="🥇 Hall./Tola"
+                                                   FontSize="12" FontWeight="SemiBold" Opacity="0.6"
+                                                   HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="3" Text="✨ Tej./Tola"
+                                                   FontSize="12" FontWeight="SemiBold" Opacity="0.6"
+                                                   HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="4" Text="🥈 Silver/Tola"
+                                                   FontSize="12" FontWeight="SemiBold" Opacity="0.6"
+                                                   HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="5" Text="🥇 Hall./10g"
+                                                   FontSize="12" FontWeight="SemiBold" Opacity="0.6"
+                                                   HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="6" Text="✨ Tej./10g"
+                                                   FontSize="12" FontWeight="SemiBold" Opacity="0.6"
+                                                   HorizontalAlignment="Right" />
+                                        <TextBlock Grid.Column="7" Text="🥈 Silver/10g"
+                                                   FontSize="12" FontWeight="SemiBold" Opacity="0.6"
+                                                   HorizontalAlignment="Right" />
+                                    </Grid>
+                                </Border>
+
+                                <!-- Table rows -->
+                                <ItemsControl ItemsSource="{x:Bind ViewModel.Bullion.Rows, Mode=OneWay}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="viewmodels:BullionRowViewModel">
+                                            <Border Padding="16,10"
+                                                    Background="{Binding RowBackground}"
+                                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                    BorderThickness="0,0,0,1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="110" />
+                                                        <ColumnDefinition Width="110" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Column="0"
+                                                               Text="{x:Bind AdDate}"
+                                                               FontSize="13"
+                                                               FontWeight="{Binding RowFontWeight}" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Text="{x:Bind BsDate}"
+                                                               FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                               FontSize="13"
+                                                               FontWeight="{Binding RowFontWeight}" />
+                                                    <TextBlock Grid.Column="2"
+                                                               Text="{x:Bind GoldHallmarkPerTola}"
+                                                               FontSize="13"
+                                                               HorizontalAlignment="Right"
+                                                               FontWeight="{Binding RowFontWeight}" />
+                                                    <TextBlock Grid.Column="3"
+                                                               Text="{x:Bind GoldTejabiPerTola}"
+                                                               FontSize="13"
+                                                               HorizontalAlignment="Right"
+                                                               FontWeight="{Binding RowFontWeight}" />
+                                                    <TextBlock Grid.Column="4"
+                                                               Text="{x:Bind SilverPerTola}"
+                                                               FontSize="13"
+                                                               HorizontalAlignment="Right"
+                                                               FontWeight="{Binding RowFontWeight}" />
+                                                    <TextBlock Grid.Column="5"
+                                                               Text="{x:Bind GoldHallmarkPer10g}"
+                                                               FontSize="13"
+                                                               HorizontalAlignment="Right"
+                                                               Opacity="0.75" />
+                                                    <TextBlock Grid.Column="6"
+                                                               Text="{x:Bind GoldTejabiPer10g}"
+                                                               FontSize="13"
+                                                               HorizontalAlignment="Right"
+                                                               Opacity="0.75" />
+                                                    <TextBlock Grid.Column="7"
+                                                               Text="{x:Bind SilverPer10g}"
+                                                               FontSize="13"
+                                                               HorizontalAlignment="Right"
+                                                               Opacity="0.75" />
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
