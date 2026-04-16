@@ -169,8 +169,16 @@ public sealed class ForexViewModel : BindableBase
     private bool _isUpdatingConverterValues;
     private ConverterInputSide _lastEditedSide = ConverterInputSide.From;
 
+    // Trend state
+    private ForexCurrencyOption? _trendCurrency;
+    private string _selectedTrendRange = "7D";
+    private bool _isTrendBusy;
+    private string _trendError = string.Empty;
+    private bool _hasTrendData;
+
     // Cancellation for in-flight history requests
     private CancellationTokenSource? _historyCts;
+    private CancellationTokenSource? _trendCts;
 
     public ForexViewModel(AppServices services)
     {
@@ -179,12 +187,14 @@ public sealed class ForexViewModel : BindableBase
         SelectCurrencyCommand = new AsyncRelayCommand<ForexRateRowViewModel>(SelectCurrencyAsync);
         CloseHistoryCommand = new RelayCommand(CloseHistory);
         SwapCurrenciesCommand = new RelayCommand(SwapCurrencies);
+        SetTrendRangeCommand = new RelayCommand(p => SetTrendRange(p as string));
     }
 
     public ICommand RefreshCommand { get; }
     public ICommand SelectCurrencyCommand { get; }
     public ICommand CloseHistoryCommand { get; }
     public ICommand SwapCurrenciesCommand { get; }
+    public ICommand SetTrendRangeCommand { get; }
 
     /// <summary>All currency rows for today's table.</summary>
     public ObservableCollection<ForexRateRowViewModel> Rates { get; } = new();
@@ -194,6 +204,9 @@ public sealed class ForexViewModel : BindableBase
 
     /// <summary>Supported currencies for converter.</summary>
     public ObservableCollection<ForexCurrencyOption> SupportedCurrencies { get; } = new();
+
+    /// <summary>Chart data points for the selected trend currency and range.</summary>
+    public ObservableCollection<ForexChartPoint> TrendPoints { get; } = new();
 
     // ── Today's data ──
 
@@ -349,6 +362,54 @@ public sealed class ForexViewModel : BindableBase
     {
         get => _converterRateSummary;
         private set => SetProperty(ref _converterRateSummary, value);
+    }
+
+    public ForexCurrencyOption? TrendCurrency
+    {
+        get => _trendCurrency;
+        set
+        {
+            if (SetProperty(ref _trendCurrency, value))
+                _ = LoadTrendAsync();
+        }
+    }
+
+    public string SelectedTrendRange
+    {
+        get => _selectedTrendRange;
+        private set
+        {
+            if (SetProperty(ref _selectedTrendRange, value))
+            {
+                RaisePropertyChanged(nameof(IsTrendRange2D));
+                RaisePropertyChanged(nameof(IsTrendRange7D));
+                RaisePropertyChanged(nameof(IsTrendRange1M));
+                RaisePropertyChanged(nameof(IsTrendRange3M));
+            }
+        }
+    }
+
+    public bool IsTrendRange2D => string.Equals(SelectedTrendRange, "2D", StringComparison.Ordinal);
+    public bool IsTrendRange7D => string.Equals(SelectedTrendRange, "7D", StringComparison.Ordinal);
+    public bool IsTrendRange1M => string.Equals(SelectedTrendRange, "1M", StringComparison.Ordinal);
+    public bool IsTrendRange3M => string.Equals(SelectedTrendRange, "3M", StringComparison.Ordinal);
+
+    public bool IsTrendBusy
+    {
+        get => _isTrendBusy;
+        private set => SetProperty(ref _isTrendBusy, value);
+    }
+
+    public string TrendError
+    {
+        get => _trendError;
+        private set => SetProperty(ref _trendError, value);
+    }
+
+    public bool HasTrendData
+    {
+        get => _hasTrendData;
+        private set => SetProperty(ref _hasTrendData, value);
     }
 
     // ── Init / Refresh ──
@@ -546,6 +607,13 @@ public sealed class ForexViewModel : BindableBase
                 string.Equals(c.Code, DefaultToCurrencyCode, StringComparison.OrdinalIgnoreCase))
             ?? SupportedCurrencies[0];
 
+        var trendCode = TrendCurrency?.Code ?? DefaultFromCurrencyCode;
+        TrendCurrency = SupportedCurrencies.FirstOrDefault(c =>
+                string.Equals(c.Code, trendCode, StringComparison.OrdinalIgnoreCase))
+            ?? SupportedCurrencies.FirstOrDefault(c =>
+                string.Equals(c.Code, DefaultFromCurrencyCode, StringComparison.OrdinalIgnoreCase))
+            ?? SupportedCurrencies[0];
+
         if (string.IsNullOrWhiteSpace(ConverterFromAmount))
         {
             SetConverterFromAmountSilently("1");
@@ -553,6 +621,7 @@ public sealed class ForexViewModel : BindableBase
         }
 
         UpdateConversionFromEditedSide();
+        _ = LoadTrendAsync();
     }
 
     private void SwapCurrencies()
@@ -631,6 +700,89 @@ public sealed class ForexViewModel : BindableBase
 
     private static string FormatAmount(decimal amount)
         => amount.ToString("0.####", CultureInfo.InvariantCulture);
+
+    private void SetTrendRange(string? range)
+    {
+        if (string.IsNullOrWhiteSpace(range))
+            return;
+
+        range = range.Trim().ToUpperInvariant();
+        if (range is not ("2D" or "7D" or "1M" or "3M"))
+            return;
+
+        if (!string.Equals(SelectedTrendRange, range, StringComparison.Ordinal))
+            SelectedTrendRange = range;
+
+        _ = LoadTrendAsync();
+    }
+
+    private async Task LoadTrendAsync()
+    {
+        if (TrendCurrency is null)
+        {
+            TrendPoints.Clear();
+            HasTrendData = false;
+            TrendError = string.Empty;
+            return;
+        }
+
+        _trendCts?.Cancel();
+        _trendCts?.Dispose();
+        _trendCts = new CancellationTokenSource();
+
+        IsTrendBusy = true;
+        TrendError = string.Empty;
+        HasTrendData = false;
+        TrendPoints.Clear();
+
+        try
+        {
+            var to = DateOnly.FromDateTime(DateTime.Today);
+            var days = SelectedTrendRange switch
+            {
+                "2D" => 2,
+                "1M" => 30,
+                "3M" => 90,
+                _ => 7
+            };
+
+            var from = to.AddDays(-(days - 1));
+            var history = await _services.Forex.FetchHistoryAsync(
+                TrendCurrency.Code, from, to, _trendCts.Token);
+
+            if (history.Count == 0)
+            {
+                TrendError = "No trend data available for this currency and range.";
+                return;
+            }
+
+            var deduped = history
+                .GroupBy(h => h.AddedDate)
+                .Select(g => g.Last())
+                .OrderBy(h => h.AddedDate)
+                .ToList();
+
+            foreach (var pt in deduped)
+                TrendPoints.Add(new ForexChartPoint(pt.AddedDate, pt.Buying, pt.Selling));
+
+            HasTrendData = TrendPoints.Count > 1;
+            if (!HasTrendData)
+                TrendError = "Not enough points to draw trend.";
+        }
+        catch (OperationCanceledException)
+        {
+            // Switched currency/range.
+        }
+        catch (Exception ex)
+        {
+            TrendError = $"Failed to load trend: {ex.Message}";
+            Debug.WriteLine($"ForexViewModel trend error: {ex}");
+        }
+        finally
+        {
+            IsTrendBusy = false;
+        }
+    }
 
     private void SetConverterFromAmountSilently(string value)
     {

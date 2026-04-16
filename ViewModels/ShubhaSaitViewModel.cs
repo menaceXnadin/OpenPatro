@@ -152,9 +152,14 @@ public sealed class ShubhaSaitViewModel : BindableBase
 
         try
         {
-            var json = await _services.NepaliPatroApi.FetchShubhaSaitRawJsonAsync();
-            _cachedData = ParseShubhaSaitJson(json);
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(20));
+            var json = await _services.NepaliPatroApi.FetchShubhaSaitRawJsonAsync(cts.Token);
+            _cachedData = await Task.Run(() => ParseShubhaSaitJson(json), cts.Token);
             PopulateYears();
+        }
+        catch (OperationCanceledException)
+        {
+            ErrorMessage = "Shubha Sait request timed out. Please try again.";
         }
         catch (Exception ex)
         {
@@ -196,7 +201,7 @@ public sealed class ShubhaSaitViewModel : BindableBase
                         days.Add(dayProp.Name);
                     }
 
-                    days.Sort((a, b) => int.Parse(a).CompareTo(int.Parse(b)));
+                    days.Sort(static (a, b) => ParseSortableInt(a).CompareTo(ParseSortableInt(b)));
                     months[monthKey] = days;
                 }
 
@@ -283,7 +288,7 @@ public sealed class ShubhaSaitViewModel : BindableBase
             return;
         }
 
-        foreach (var monthKey in monthData.Keys.OrderBy(m => int.Parse(m)))
+        foreach (var monthKey in monthData.Keys.OrderBy(static m => ParseSortableInt(m)))
         {
             var displayName = BsMonthNames.TryGetValue(monthKey, out var name) ? name : $"Month {monthKey}";
             AvailableMonths.Add(new SaitMonthInfo(monthKey, displayName));
@@ -337,6 +342,11 @@ public sealed class ShubhaSaitViewModel : BindableBase
         }
 
         return new List<string>(days);
+    }
+
+    private static int ParseSortableInt(string value)
+    {
+        return int.TryParse(value, out var parsed) ? parsed : int.MaxValue;
     }
 }
 

@@ -18,6 +18,17 @@
           Padding="20">
         <Grid.Resources>
             <infrastructure:StringToImageSourceConverter x:Key="StringToImageSourceConverter" />
+            <Style x:Key="TrendRangeButtonStyle" TargetType="ToggleButton">
+                <Setter Property="MinWidth" Value="46" />
+                <Setter Property="Height" Value="34" />
+                <Setter Property="Padding" Value="12,0" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
             <Style x:Key="RailButtonStyle" TargetType="ToggleButton">
                 <Setter Property="Width" Value="48" />
                 <Setter Property="Height" Value="48" />
@@ -221,6 +232,15 @@
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                 ToolTipService.ToolTip="Next month">
                             <SymbolIcon Symbol="Forward" />
+                        </Button>
+                        <Button Command="{x:Bind ViewModel.Calendar.RefreshCommand, Mode=OneWay}"
+                                Width="36" Height="36" Padding="0"
+                                CornerRadius="18"
+                                Background="Transparent"
+                                BorderThickness="1"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                ToolTipService.ToolTip="Refresh calendar data">
+                            <FontIcon Glyph="&#xE72C;" FontSize="12" />
                         </Button>
                     </StackPanel>
                 </Grid>
@@ -1238,18 +1258,27 @@
                                           Margin="16,0,0,0"
                                           HorizontalAlignment="Stretch"
                                           SelectionChanged="RashifalZodiacPicker_SelectionChanged">
-                                    <ComboBoxItem Content="मेष (Aries)" Tag="aries" />
-                                    <ComboBoxItem Content="वृष (Taurus)" Tag="taurus" />
-                                    <ComboBoxItem Content="मिथुन (Gemini)" Tag="gemini" />
-                                    <ComboBoxItem Content="कर्कट (Cancer)" Tag="cancer" />
-                                    <ComboBoxItem Content="सिंह (Leo)" Tag="leo" />
-                                    <ComboBoxItem Content="कन्या (Virgo)" Tag="virgo" />
-                                    <ComboBoxItem Content="तुला (Libra)" Tag="libra" />
-                                    <ComboBoxItem Content="वृश्चिक (Scorpio)" Tag="scorpio" />
-                                    <ComboBoxItem Content="धनु (Sagittarius)" Tag="sagittarius" />
-                                    <ComboBoxItem Content="मकर (Capricorn)" Tag="capricorn" />
-                                    <ComboBoxItem Content="कुम्भ (Aquarius)" Tag="aquarius" />
-                                    <ComboBoxItem Content="मीन (Pisces)" Tag="pisces" />
+                                    <ComboBoxItem Tag="aries">
+                                        <Grid ColumnSpacing="10" MinHeight="28">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <FontIcon Glyph="&#x2648;" FontSize="16" FontFamily="Segoe UI Symbol" />
+                                            <TextBlock Grid.Column="1" Text="मेष (Aries)" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </ComboBoxItem>
+                                    <ComboBoxItem Tag="taurus"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x2649;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="वृष (Taurus)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="gemini"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x264A;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="मिथुन (Gemini)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="cancer"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x264B;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="कर्कट (Cancer)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="leo"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x264C;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="सिंह (Leo)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="virgo"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x264D;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="कन्या (Virgo)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="libra"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x264E;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="तुला (Libra)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="scorpio"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x264F;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="वृश्चिक (Scorpio)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="sagittarius"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x2650;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="धनु (Sagittarius)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="capricorn"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x2651;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="मकर (Capricorn)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="aquarius"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x2652;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="कुम्भ (Aquarius)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
+                                    <ComboBoxItem Tag="pisces"><Grid ColumnSpacing="10" MinHeight="28"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><FontIcon Glyph="&#x2653;" FontSize="16" FontFamily="Segoe UI Symbol" /><TextBlock Grid.Column="1" Text="मीन (Pisces)" VerticalAlignment="Center" /></Grid></ComboBoxItem>
                                 </ComboBox>
                             </Grid>
                         </Border>
@@ -1424,25 +1453,49 @@
                                    Visibility="{x:Bind StringToVisibility(ViewModel.DateConverter.ErrorMessage), Mode=OneWay}"
                                    Foreground="#FF6B6B"
                                    TextWrapping="Wrap" />
-                        <Border Padding="20" CornerRadius="16"
+                        <Border Padding="22" CornerRadius="16"
                                 Background="{ThemeResource LayerFillColorAltBrush}">
-                            <StackPanel Spacing="16">
-                                <ComboBox x:Name="DateConverterDirectionPicker"
-                                          Header="Direction"
-                                          SelectedIndex="0"
-                                          HorizontalAlignment="Stretch"
-                                          SelectionChanged="DateConverterDirection_SelectionChanged">
-                                    <ComboBoxItem Content="BS → AD (बि.सं. → ई.सं.)" Tag="BS" />
-                                    <ComboBoxItem Content="AD → BS (ई.सं. → बि.सं.)" Tag="AD" />
-                                </ComboBox>
+                            <StackPanel Spacing="18">
                                 <Grid ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="2*" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="Conversion Setup" FontSize="16" FontWeight="SemiBold" />
+                                        <TextBlock Text="Choose direction and enter date parts"
+                                                   FontSize="12"
+                                                   Opacity="0.6" />
+                                    </StackPanel>
+                                    <ComboBox x:Name="DateConverterDirectionPicker"
+                                              Grid.Column="1"
+                                              MinWidth="260"
+                                              SelectedIndex="0"
+                                              HorizontalAlignment="Right"
+                                              SelectionChanged="DateConverterDirection_SelectionChanged">
+                                        <ComboBoxItem Content="BS → AD (बि.सं. → ई.सं.)" Tag="BS" />
+                                        <ComboBoxItem Content="AD → BS (ई.सं. → बि.सं.)" Tag="AD" />
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid ColumnSpacing="12" RowSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.6*" />
+                                        <ColumnDefinition Width="1.2*" />
+                                        <ColumnDefinition Width="0.9*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Text="Year" FontSize="12" Opacity="0.62" />
+                                    <TextBlock Grid.Column="1" Text="Month (महिना)" FontSize="12" Opacity="0.62" />
+                                    <TextBlock Grid.Column="2" Text="Day" FontSize="12" Opacity="0.62" />
+
                                     <TextBox x:Name="DateConverterYearBox"
-                                             Header="Year"
+                                             Grid.Row="1"
+                                             Height="40"
                                              PlaceholderText="2082"
                                              InputScope="Number"
                                              MaxLength="4"
@@ -1450,8 +1503,9 @@
                                              TextChanged="DateConverterInputPart_TextChanged"
                                              KeyDown="DateConverterInputPart_KeyDown" />
                                     <ComboBox x:Name="DateConverterMonthPicker"
+                                              Grid.Row="1"
                                               Grid.Column="1"
-                                              Header="महिना (Month)"
+                                              Height="40"
                                               PlaceholderText="Choose month"
                                               SelectionChanged="DateConverterMonthPicker_SelectionChanged"
                                               KeyDown="DateConverterInputPart_KeyDown">
@@ -1469,8 +1523,9 @@
                                         <ComboBoxItem Content="चैत" Tag="12" />
                                     </ComboBox>
                                     <TextBox x:Name="DateConverterDayBox"
+                                             Grid.Row="1"
                                              Grid.Column="2"
-                                             Header="Day"
+                                             Height="40"
                                              PlaceholderText="28"
                                              InputScope="Number"
                                              MaxLength="2"
@@ -1478,7 +1533,13 @@
                                              TextChanged="DateConverterInputPart_TextChanged"
                                              KeyDown="DateConverterInputPart_KeyDown" />
                                 </Grid>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
+
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
                                     <Button x:Name="DateConverterConvertButton"
                                             Command="{x:Bind ViewModel.DateConverter.ConvertCommand, Mode=OneWay}"
                                             Style="{ThemeResource AccentButtonStyle}">
@@ -1487,19 +1548,19 @@
                                             <TextBlock Text="Convert" />
                                         </StackPanel>
                                     </Button>
-                                    <Button Click="DateConverterClearButton_Click">
+                                    <Button Grid.Column="1" Click="DateConverterClearButton_Click">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <FontIcon Glyph="&#xE894;" FontSize="14" />
                                             <TextBlock Text="Clear" />
                                         </StackPanel>
                                     </Button>
-                                    <Button Command="{x:Bind ViewModel.DateConverter.RefreshCommand, Mode=OneWay}">
+                                    <Button Grid.Column="2" Command="{x:Bind ViewModel.DateConverter.RefreshCommand, Mode=OneWay}">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
                                             <FontIcon Glyph="&#xE72C;" FontSize="14" />
                                             <TextBlock Text="Re-convert" />
                                         </StackPanel>
                                     </Button>
-                                </StackPanel>
+                                </Grid>
                             </StackPanel>
                         </Border>
                         <Border Padding="24" CornerRadius="16"
@@ -1510,35 +1571,49 @@
                                            FontFamily="{StaticResource AppNepaliFontFamily}"
                                            FontSize="20"
                                            FontWeight="SemiBold" />
-                                <Grid RowSpacing="12" ColumnSpacing="24">
+                                <Grid ColumnSpacing="14" RowSpacing="12">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
                                         <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="AD Date (ई.सं.)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
-                                    <TextBlock Grid.Column="1"
-                                               Text="{x:Bind ViewModel.DateConverter.ResultAdDate, Mode=OneWay}"
-                                               FontWeight="SemiBold" FontSize="16" />
-                                    <TextBlock Grid.Row="1" Text="BS Date (बि.सं.)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
-                                    <TextBlock Grid.Row="1" Grid.Column="1"
-                                               Text="{x:Bind ViewModel.DateConverter.ResultBsDate, Mode=OneWay}"
-                                               FontWeight="SemiBold" FontSize="16" />
-                                    <TextBlock Grid.Row="2" Text="Tithi (तिथि)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1"
-                                               Text="{x:Bind ViewModel.DateConverter.ResultTithiLabel, Mode=OneWay}" />
-                                    <TextBlock Grid.Row="3" Text="Nepal Sambat (ने.सं.)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
-                                    <TextBlock Grid.Row="3" Grid.Column="1"
-                                               Text="{x:Bind ViewModel.DateConverter.ResultNsYear, Mode=OneWay}" />
-                                    <TextBlock Grid.Row="4" Text="Chandrama (चन्द्रमा)" Opacity="0.56" FontFamily="{StaticResource AppNepaliFontFamily}" />
-                                    <TextBlock Grid.Row="4" Grid.Column="1"
-                                               Text="{x:Bind ViewModel.DateConverter.ResultChandrama, Mode=OneWay}" />
+
+                                    <Border Padding="12" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="AD Date (ई.सं.)" Opacity="0.6" FontSize="12" />
+                                            <TextBlock Text="{x:Bind ViewModel.DateConverter.ResultAdDate, Mode=OneWay}" FontWeight="SemiBold" FontSize="15" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Padding="12" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="BS Date (बि.सं.)" Opacity="0.6" FontSize="12" FontFamily="{StaticResource AppNepaliFontFamily}" />
+                                            <TextBlock Text="{x:Bind ViewModel.DateConverter.ResultBsDate, Mode=OneWay}" FontWeight="SemiBold" FontSize="15" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Row="1" Padding="12" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="Tithi (तिथि)" Opacity="0.6" FontSize="12" FontFamily="{StaticResource AppNepaliFontFamily}" />
+                                            <TextBlock Text="{x:Bind ViewModel.DateConverter.ResultTithiLabel, Mode=OneWay}" FontSize="14" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Row="1" Grid.Column="1" Padding="12" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="Nepal Sambat (ने.सं.)" Opacity="0.6" FontSize="12" FontFamily="{StaticResource AppNepaliFontFamily}" />
+                                            <TextBlock Text="{x:Bind ViewModel.DateConverter.ResultNsYear, Mode=OneWay}" FontSize="14" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Row="2" Grid.ColumnSpan="2" Padding="12" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="Chandrama (चन्द्रमा)" Opacity="0.6" FontSize="12" FontFamily="{StaticResource AppNepaliFontFamily}" />
+                                            <TextBlock Text="{x:Bind ViewModel.DateConverter.ResultChandrama, Mode=OneWay}" FontSize="14" />
+                                        </StackPanel>
+                                    </Border>
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -1561,6 +1636,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
                     <StackPanel VerticalAlignment="Center">
                         <TextBlock Text="सुन / चाँदी मूल्य"
@@ -1574,12 +1650,25 @@
                                    Margin="1,2,0,0"
                                    CharacterSpacing="40" />
                     </StackPanel>
-                    <Button Grid.Column="1"
+
+                    <ComboBox x:Name="BullionRangePicker"
+                              Grid.Column="1"
+                              MinWidth="150"
+                              Margin="0,0,10,0"
+                              HorizontalAlignment="Right"
+                              VerticalAlignment="Center"
+                              SelectionChanged="BullionRangePicker_SelectionChanged">
+                        <ComboBoxItem Content="Last 30 days" Tag="30D" />
+                        <ComboBoxItem Content="Last 90 days" Tag="90D" />
+                        <ComboBoxItem Content="Last 6 months" Tag="6M" />
+                        <ComboBoxItem Content="Last 1 year" Tag="1Y" />
+                        <ComboBoxItem Content="All available" Tag="ALL" />
+                    </ComboBox>
+
+                    <Button Grid.Column="2"
                             Command="{x:Bind ViewModel.Bullion.RefreshCommand, Mode=OneWay}"
-                            Width="36" Height="36" Padding="0"
-                            CornerRadius="18"
-                            Background="Transparent"
-                            BorderThickness="1"
+                            Width="36" Height="36" Padding="0" CornerRadius="18"
+                            Background="Transparent" BorderThickness="1"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             ToolTipService.ToolTip="Refresh">
                         <FontIcon Glyph="&#xE72C;" FontSize="14" />
@@ -1594,12 +1683,17 @@
                         <!-- Loading / Error -->
                         <ProgressRing IsActive="{x:Bind ViewModel.Bullion.IsBusy, Mode=OneWay}"
                                       Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.IsBusy), Mode=OneWay}"
-                                      Width="32" Height="32"
-                                      HorizontalAlignment="Left" />
+                                      Width="32" Height="32" HorizontalAlignment="Left" />
                         <TextBlock Text="{x:Bind ViewModel.Bullion.ErrorMessage, Mode=OneWay}"
                                    Visibility="{x:Bind StringToVisibility(ViewModel.Bullion.ErrorMessage), Mode=OneWay}"
                                    Foreground="#FF6B6B"
                                    TextWrapping="Wrap" />
+
+                        <TextBlock x:Name="BullionRangeSummaryText"
+                                   Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.HasData), Mode=OneWay}"
+                                   FontSize="12"
+                                   Opacity="0.65"
+                                   Margin="0,2,0,0" />
 
                         <!-- ── Today's date badge ── -->
                         <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
@@ -1632,7 +1726,7 @@
                                     BorderThickness="1"
                                     CornerRadius="16"
                                     Padding="20,16">
-                                <StackPanel Spacing="6">
+                                <StackPanel Spacing="10">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <TextBlock Text="🥇" FontSize="16" />
                                         <TextBlock Text="Hallmark Gold"
@@ -1640,10 +1734,6 @@
                                                    Opacity="0.6"
                                                    VerticalAlignment="Center" />
                                     </StackPanel>
-                                    <TextBlock Text="{x:Bind ViewModel.Bullion.GoldHallmarkPerTola, Mode=OneWay}"
-                                               FontSize="22" FontWeight="Bold" />
-                                    <TextBlock Text="per tola"
-                                               FontSize="11" Opacity="0.5" />
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Text="▲"
                                                    FontSize="11"
@@ -1657,13 +1747,50 @@
                                                    FontSize="12"
                                                    Opacity="0.7" />
                                     </StackPanel>
-                                    <Border Height="1"
-                                            Background="{ThemeResource CardStrokeColorDefaultBrush}"
-                                            Margin="0,4,0,4" />
-                                    <TextBlock Text="{x:Bind ViewModel.Bullion.GoldHallmarkPer10g, Mode=OneWay}"
-                                               FontSize="14" FontWeight="SemiBold" Opacity="0.8" />
-                                    <TextBlock Text="per 10g"
-                                               FontSize="11" Opacity="0.5" />
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Padding="10,8" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{x:Bind ViewModel.Bullion.GoldHallmarkPerTola, Mode=OneWay}"
+                                                           FontSize="20" FontWeight="Bold" />
+                                                <TextBlock Text="per tola" FontSize="11" Opacity="0.5" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="1" Padding="10,8" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{x:Bind ViewModel.Bullion.GoldHallmarkPer10g, Mode=OneWay}"
+                                                           FontSize="16" FontWeight="SemiBold" Opacity="0.9" />
+                                                <TextBlock Text="per 10g" FontSize="11" Opacity="0.5" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                    <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0,2,0,0" />
+                                    <TextBlock Text="30-day trend" FontSize="11" Opacity="0.52" />
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            Padding="8"
+                                            MinHeight="108">
+                                        <Canvas x:Name="BullionHallmarkChartCanvas"
+                                                Height="90"
+                                                SizeChanged="BullionChartCanvas_SizeChanged"
+                                                PointerMoved="BullionChartCanvas_PointerMoved"
+                                                PointerExited="BullionChartCanvas_PointerExited" />
+                                    </Border>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="BullionHallmarkDateStart" FontSize="10" Opacity="0.5" />
+                                        <TextBlock x:Name="BullionHallmarkDateMid" Grid.Column="1" FontSize="10" Opacity="0.5" HorizontalAlignment="Center" />
+                                        <TextBlock x:Name="BullionHallmarkDateEnd" Grid.Column="2" FontSize="10" Opacity="0.5" HorizontalAlignment="Right" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
@@ -1674,7 +1801,7 @@
                                     BorderThickness="1"
                                     CornerRadius="16"
                                     Padding="20,16">
-                                <StackPanel Spacing="6">
+                                <StackPanel Spacing="10">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <TextBlock Text="✨" FontSize="16" />
                                         <TextBlock Text="Tejabi Gold"
@@ -1682,10 +1809,6 @@
                                                    Opacity="0.6"
                                                    VerticalAlignment="Center" />
                                     </StackPanel>
-                                    <TextBlock Text="{x:Bind ViewModel.Bullion.GoldTejabiPerTola, Mode=OneWay}"
-                                               FontSize="22" FontWeight="Bold" />
-                                    <TextBlock Text="per tola"
-                                               FontSize="11" Opacity="0.5" />
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Text="▲"
                                                    FontSize="11"
@@ -1699,13 +1822,50 @@
                                                    FontSize="12"
                                                    Opacity="0.7" />
                                     </StackPanel>
-                                    <Border Height="1"
-                                            Background="{ThemeResource CardStrokeColorDefaultBrush}"
-                                            Margin="0,4,0,4" />
-                                    <TextBlock Text="{x:Bind ViewModel.Bullion.GoldTejabiPer10g, Mode=OneWay}"
-                                               FontSize="14" FontWeight="SemiBold" Opacity="0.8" />
-                                    <TextBlock Text="per 10g"
-                                               FontSize="11" Opacity="0.5" />
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Padding="10,8" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{x:Bind ViewModel.Bullion.GoldTejabiPerTola, Mode=OneWay}"
+                                                           FontSize="20" FontWeight="Bold" />
+                                                <TextBlock Text="per tola" FontSize="11" Opacity="0.5" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="1" Padding="10,8" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{x:Bind ViewModel.Bullion.GoldTejabiPer10g, Mode=OneWay}"
+                                                           FontSize="16" FontWeight="SemiBold" Opacity="0.9" />
+                                                <TextBlock Text="per 10g" FontSize="11" Opacity="0.5" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                    <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0,2,0,0" />
+                                    <TextBlock Text="30-day trend" FontSize="11" Opacity="0.52" />
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            Padding="8"
+                                            MinHeight="108">
+                                        <Canvas x:Name="BullionTejabiChartCanvas"
+                                                Height="90"
+                                                SizeChanged="BullionChartCanvas_SizeChanged"
+                                                PointerMoved="BullionChartCanvas_PointerMoved"
+                                                PointerExited="BullionChartCanvas_PointerExited" />
+                                    </Border>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="BullionTejabiDateStart" FontSize="10" Opacity="0.5" />
+                                        <TextBlock x:Name="BullionTejabiDateMid" Grid.Column="1" FontSize="10" Opacity="0.5" HorizontalAlignment="Center" />
+                                        <TextBlock x:Name="BullionTejabiDateEnd" Grid.Column="2" FontSize="10" Opacity="0.5" HorizontalAlignment="Right" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
@@ -1716,7 +1876,7 @@
                                     BorderThickness="1"
                                     CornerRadius="16"
                                     Padding="20,16">
-                                <StackPanel Spacing="6">
+                                <StackPanel Spacing="10">
                                     <StackPanel Orientation="Horizontal" Spacing="6">
                                         <TextBlock Text="🥈" FontSize="16" />
                                         <TextBlock Text="Silver"
@@ -1724,10 +1884,6 @@
                                                    Opacity="0.6"
                                                    VerticalAlignment="Center" />
                                     </StackPanel>
-                                    <TextBlock Text="{x:Bind ViewModel.Bullion.SilverPerTola, Mode=OneWay}"
-                                               FontSize="22" FontWeight="Bold" />
-                                    <TextBlock Text="per tola"
-                                               FontSize="11" Opacity="0.5" />
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Text="▲"
                                                    FontSize="11"
@@ -1741,13 +1897,50 @@
                                                    FontSize="12"
                                                    Opacity="0.7" />
                                     </StackPanel>
-                                    <Border Height="1"
-                                            Background="{ThemeResource CardStrokeColorDefaultBrush}"
-                                            Margin="0,4,0,4" />
-                                    <TextBlock Text="{x:Bind ViewModel.Bullion.SilverPer10g, Mode=OneWay}"
-                                               FontSize="14" FontWeight="SemiBold" Opacity="0.8" />
-                                    <TextBlock Text="per 10g"
-                                               FontSize="11" Opacity="0.5" />
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Padding="10,8" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{x:Bind ViewModel.Bullion.SilverPerTola, Mode=OneWay}"
+                                                           FontSize="20" FontWeight="Bold" />
+                                                <TextBlock Text="per tola" FontSize="11" Opacity="0.5" />
+                                            </StackPanel>
+                                        </Border>
+                                        <Border Grid.Column="1" Padding="10,8" CornerRadius="10" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{x:Bind ViewModel.Bullion.SilverPer10g, Mode=OneWay}"
+                                                           FontSize="16" FontWeight="SemiBold" Opacity="0.9" />
+                                                <TextBlock Text="per 10g" FontSize="11" Opacity="0.5" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                    <Border Height="1" Background="{ThemeResource CardStrokeColorDefaultBrush}" Margin="0,2,0,0" />
+                                    <TextBlock Text="30-day trend" FontSize="11" Opacity="0.52" />
+                                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
+                                            Padding="8"
+                                            MinHeight="108">
+                                        <Canvas x:Name="BullionSilverChartCanvas"
+                                                Height="90"
+                                                SizeChanged="BullionChartCanvas_SizeChanged"
+                                                PointerMoved="BullionChartCanvas_PointerMoved"
+                                                PointerExited="BullionChartCanvas_PointerExited" />
+                                    </Border>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="BullionSilverDateStart" FontSize="10" Opacity="0.5" />
+                                        <TextBlock x:Name="BullionSilverDateMid" Grid.Column="1" FontSize="10" Opacity="0.5" HorizontalAlignment="Center" />
+                                        <TextBlock x:Name="BullionSilverDateEnd" Grid.Column="2" FontSize="10" Opacity="0.5" HorizontalAlignment="Right" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
                         </Grid>
@@ -1864,12 +2057,75 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+
+                                <Border BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                        BorderThickness="0,1,0,0"
+                                        Padding="16,10"
+                                        Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                        Visibility="{x:Bind BoolToVisibility(ViewModel.Bullion.HasData), Mode=OneWay}">
+                                    <Grid ColumnSpacing="14" VerticalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <TextBlock x:Name="BullionRowWindowSummaryText"
+                                                   FontSize="12"
+                                                   Opacity="0.62"
+                                                   VerticalAlignment="Center" />
+
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <TextBlock Text="Items per page" FontSize="12" Opacity="0.62" VerticalAlignment="Center" />
+                                            <ComboBox x:Name="BullionItemsPerPagePicker"
+                                                      Width="96"
+                                                      SelectedIndex="2"
+                                                      SelectionChanged="BullionItemsPerPagePicker_SelectionChanged">
+                                                <ComboBoxItem Content="25" Tag="25" />
+                                                <ComboBoxItem Content="50" Tag="50" />
+                                                <ComboBoxItem Content="100" Tag="100" />
+                                                <ComboBoxItem Content="200" Tag="200" />
+                                                <ComboBoxItem Content="500" Tag="500" />
+                                            </ComboBox>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <Button x:Name="BullionPrevPageButton"
+                                                    Click="BullionPrevPageButton_Click"
+                                                    Padding="10,4"
+                                                    CornerRadius="8"
+                                                    MinWidth="84"
+                                                    ToolTipService.ToolTip="Previous page">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <FontIcon Glyph="&#xE76B;" FontSize="12" />
+                                                    <TextBlock Text="Prev" FontSize="12" />
+                                                </StackPanel>
+                                            </Button>
+                                            <TextBlock x:Name="BullionCurrentPageText"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12"
+                                                       Opacity="0.72" />
+                                            <Button x:Name="BullionNextPageButton"
+                                                    Click="BullionNextPageButton_Click"
+                                                    Padding="10,4"
+                                                    CornerRadius="8"
+                                                    MinWidth="84"
+                                                    ToolTipService.ToolTip="Next page">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="Next" FontSize="12" />
+                                                    <FontIcon Glyph="&#xE76C;" FontSize="12" />
+                                                </StackPanel>
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </StackPanel>
                         </Border>
 
                     </StackPanel>
                 </ScrollViewer>
             </Grid>
+
             <!-- ═══════════════════════════════════════════════════════════
                  FOREX SECTION  (Foreign Exchange Rates)
                  ═══════════════════════════════════════════════════════════ -->
@@ -1935,105 +2191,233 @@
                                     CornerRadius="16"
                                     Padding="16"
                                     Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasData), Mode=OneWay}">
-                                <StackPanel Spacing="12">
-                                    <TextBlock Text="Currency Converter"
-                                               FontSize="15"
-                                               FontWeight="SemiBold" />
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <ComboBox Header="From"
-                                                  ItemsSource="{x:Bind ViewModel.Forex.SupportedCurrencies, Mode=OneWay}"
-                                                  SelectedItem="{x:Bind ViewModel.Forex.ConverterFromCurrency, Mode=TwoWay}">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="viewmodels:ForexCurrencyOption">
-                                                    <Grid ColumnSpacing="10" MinHeight="28">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="*" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <Grid Width="28" Height="20" VerticalAlignment="Center">
-                                                            <Image Source="{Binding FlagCdnUrl, Converter={StaticResource StringToImageSourceConverter}}"
-                                                                   Stretch="Uniform"
-                                                                   ImageOpened="ForexFlagImage_ImageOpened"
-                                                                   ImageFailed="ForexFlagImage_ImageFailed"
-                                                                   Tag="{x:Bind Flag}" />
-                                                            <TextBlock Text="{x:Bind Flag}"
-                                                                       Visibility="Collapsed"
-                                                                       HorizontalAlignment="Center"
-                                                                       VerticalAlignment="Center" />
+                                <Grid ColumnSpacing="18">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.05*" />
+                                        <ColumnDefinition Width="0.95*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Spacing="14">
+                                        <TextBlock Text="Currency Converter"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold" />
+                                        <Grid RowSpacing="8" ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="From" FontSize="13" Opacity="0.78" />
+                                            <TextBlock Grid.Column="2" Text="To" FontSize="13" Opacity="0.78" />
+
+                                            <ComboBox Grid.Row="1"
+                                                      MinHeight="56"
+                                                      ItemsSource="{x:Bind ViewModel.Forex.SupportedCurrencies, Mode=OneWay}"
+                                                      SelectedItem="{x:Bind ViewModel.Forex.ConverterFromCurrency, Mode=TwoWay}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="viewmodels:ForexCurrencyOption">
+                                                        <Grid ColumnSpacing="10" MinHeight="28">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Grid Width="28" Height="20" VerticalAlignment="Center">
+                                                                <Image Source="{Binding FlagCdnUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                                                                       Stretch="Uniform"
+                                                                       ImageOpened="ForexFlagImage_ImageOpened"
+                                                                       ImageFailed="ForexFlagImage_ImageFailed"
+                                                                       Tag="{x:Bind Flag}" />
+                                                                <TextBlock Text="{x:Bind Flag}"
+                                                                           Visibility="Collapsed"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                            </Grid>
+                                                            <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{x:Bind Code}" FontWeight="SemiBold" />
+                                                                <TextBlock Text="{x:Bind Currency}" Opacity="0.68" FontSize="12" />
+                                                            </StackPanel>
                                                         </Grid>
-                                                        <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
-                                                            <TextBlock Text="{x:Bind Code}" FontWeight="SemiBold" />
-                                                            <TextBlock Text="{x:Bind Currency}" Opacity="0.68" FontSize="12" />
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                        <Button Grid.Column="1"
-                                                Command="{x:Bind ViewModel.Forex.SwapCurrenciesCommand, Mode=OneWay}"
-                                                Width="36"
-                                                Height="36"
-                                                Padding="0"
-                                                Margin="0,22,0,0"
-                                                CornerRadius="18"
-                                                HorizontalAlignment="Center"
-                                                VerticalAlignment="Top"
-                                                ToolTipService.ToolTip="Swap currencies">
-                                            <TextBlock Text="⇄" FontSize="16" />
-                                        </Button>
-                                        <ComboBox Grid.Column="2"
-                                                  Header="To"
-                                                  ItemsSource="{x:Bind ViewModel.Forex.SupportedCurrencies, Mode=OneWay}"
-                                                  SelectedItem="{x:Bind ViewModel.Forex.ConverterToCurrency, Mode=TwoWay}">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="viewmodels:ForexCurrencyOption">
-                                                    <Grid ColumnSpacing="10" MinHeight="28">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto" />
-                                                            <ColumnDefinition Width="*" />
-                                                        </Grid.ColumnDefinitions>
-                                                        <Grid Width="28" Height="20" VerticalAlignment="Center">
-                                                            <Image Source="{Binding FlagCdnUrl, Converter={StaticResource StringToImageSourceConverter}}"
-                                                                   Stretch="Uniform"
-                                                                   ImageOpened="ForexFlagImage_ImageOpened"
-                                                                   ImageFailed="ForexFlagImage_ImageFailed"
-                                                                   Tag="{x:Bind Flag}" />
-                                                            <TextBlock Text="{x:Bind Flag}"
-                                                                       Visibility="Collapsed"
-                                                                       HorizontalAlignment="Center"
-                                                                       VerticalAlignment="Center" />
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+
+                                            <Button Grid.Row="1"
+                                                    Grid.Column="1"
+                                                    Command="{x:Bind ViewModel.Forex.SwapCurrenciesCommand, Mode=OneWay}"
+                                                    Width="40"
+                                                    Height="40"
+                                                    Padding="0"
+                                                    CornerRadius="20"
+                                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                    BorderThickness="0"
+                                                    HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center"
+                                                    ToolTipService.ToolTip="Swap currencies">
+                                                <TextBlock Text="⇄" FontSize="15" />
+                                            </Button>
+
+                                            <ComboBox Grid.Row="1"
+                                                      Grid.Column="2"
+                                                      MinHeight="56"
+                                                      ItemsSource="{x:Bind ViewModel.Forex.SupportedCurrencies, Mode=OneWay}"
+                                                      SelectedItem="{x:Bind ViewModel.Forex.ConverterToCurrency, Mode=TwoWay}">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="viewmodels:ForexCurrencyOption">
+                                                        <Grid ColumnSpacing="10" MinHeight="28">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Grid Width="28" Height="20" VerticalAlignment="Center">
+                                                                <Image Source="{Binding FlagCdnUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                                                                       Stretch="Uniform"
+                                                                       ImageOpened="ForexFlagImage_ImageOpened"
+                                                                       ImageFailed="ForexFlagImage_ImageFailed"
+                                                                       Tag="{x:Bind Flag}" />
+                                                                <TextBlock Text="{x:Bind Flag}"
+                                                                           Visibility="Collapsed"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                            </Grid>
+                                                            <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{x:Bind Code}" FontWeight="SemiBold" />
+                                                                <TextBlock Text="{x:Bind Currency}" Opacity="0.68" FontSize="12" />
+                                                            </StackPanel>
                                                         </Grid>
-                                                        <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
-                                                            <TextBlock Text="{x:Bind Code}" FontWeight="SemiBold" />
-                                                            <TextBlock Text="{x:Bind Currency}" Opacity="0.68" FontSize="12" />
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                    </Grid>
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBox Header="From amount"
-                                                 PlaceholderText="1"
-                                                 Text="{x:Bind ViewModel.Forex.ConverterFromAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                        <TextBox Grid.Column="1"
-                                                 Header="To amount"
-                                                 PlaceholderText="0"
-                                                 Text="{x:Bind ViewModel.Forex.ConverterToAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
-                                    </Grid>
-                                    <TextBlock Text="{x:Bind ViewModel.Forex.ConverterRateSummary, Mode=OneWay}"
-                                               FontSize="12"
-                                               Opacity="0.6" />
-                                </StackPanel>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+                                        </Grid>
+
+                                        <Grid RowSpacing="8" ColumnSpacing="12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="Auto" />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="From amount" FontSize="13" Opacity="0.78" />
+                                            <TextBlock Grid.Column="1" Text="To amount" FontSize="13" Opacity="0.78" />
+                                            <TextBox Grid.Row="1"
+                                                     Height="40"
+                                                     PlaceholderText="1"
+                                                     Text="{x:Bind ViewModel.Forex.ConverterFromAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            <TextBox Grid.Row="1"
+                                                     Grid.Column="1"
+                                                     Height="40"
+                                                     PlaceholderText="0"
+                                                     Text="{x:Bind ViewModel.Forex.ConverterToAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        </Grid>
+                                        <TextBlock Text="{x:Bind ViewModel.Forex.ConverterRateSummary, Mode=OneWay}"
+                                                   FontSize="13"
+                                                   Opacity="0.72"
+                                                   Margin="0,2,0,0" />
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Spacing="12" Margin="4,0,0,0">
+                                        <TextBlock Text="Currency Trend"
+                                                   FontSize="15"
+                                                   FontWeight="SemiBold" />
+                                        <TextBlock Text="नेपाली रूपैयाँको तुलनामा विदेशी मुद्राको उतारचढाव"
+                                                   FontFamily="{StaticResource AppNepaliFontFamily}"
+                                                   Opacity="0.7" />
+
+                                        <Grid ColumnSpacing="10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox ItemsSource="{x:Bind ViewModel.Forex.SupportedCurrencies, Mode=OneWay}"
+                                                      SelectedItem="{x:Bind ViewModel.Forex.TrendCurrency, Mode=TwoWay}"
+                                                      MinWidth="210"
+                                                      HorizontalAlignment="Stretch">
+                                                <ComboBox.ItemTemplate>
+                                                    <DataTemplate x:DataType="viewmodels:ForexCurrencyOption">
+                                                        <Grid ColumnSpacing="10" MinHeight="28">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Grid Width="28" Height="20" VerticalAlignment="Center">
+                                                                <Image Source="{Binding FlagCdnUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                                                                       Stretch="Uniform"
+                                                                       ImageOpened="ForexFlagImage_ImageOpened"
+                                                                       ImageFailed="ForexFlagImage_ImageFailed"
+                                                                       Tag="{x:Bind Flag}" />
+                                                                <TextBlock Text="{x:Bind Flag}"
+                                                                           Visibility="Collapsed"
+                                                                           HorizontalAlignment="Center"
+                                                                           VerticalAlignment="Center" />
+                                                            </Grid>
+                                                            <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+                                                                <TextBlock Text="{x:Bind Code}" FontWeight="SemiBold" />
+                                                                <TextBlock Text="{x:Bind Currency}" Opacity="0.68" FontSize="12" />
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ComboBox.ItemTemplate>
+                                            </ComboBox>
+
+                                            <Border Grid.Column="1"
+                                                    Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                                    CornerRadius="10"
+                                                    Padding="4"
+                                                    VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <ToggleButton IsChecked="{x:Bind ViewModel.Forex.IsTrendRange7D, Mode=OneWay}"
+                                                              Command="{x:Bind ViewModel.Forex.SetTrendRangeCommand, Mode=OneWay}"
+                                                              CommandParameter="7D"
+                                                              Style="{StaticResource TrendRangeButtonStyle}">7D</ToggleButton>
+                                                <ToggleButton IsChecked="{x:Bind ViewModel.Forex.IsTrendRange1M, Mode=OneWay}"
+                                                              Command="{x:Bind ViewModel.Forex.SetTrendRangeCommand, Mode=OneWay}"
+                                                              CommandParameter="1M"
+                                                              Style="{StaticResource TrendRangeButtonStyle}">1M</ToggleButton>
+                                                <ToggleButton IsChecked="{x:Bind ViewModel.Forex.IsTrendRange3M, Mode=OneWay}"
+                                                              Command="{x:Bind ViewModel.Forex.SetTrendRangeCommand, Mode=OneWay}"
+                                                              CommandParameter="3M"
+                                                              Style="{StaticResource TrendRangeButtonStyle}">3M</ToggleButton>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+
+                                        <ProgressRing IsActive="{x:Bind ViewModel.Forex.IsTrendBusy, Mode=OneWay}"
+                                                      Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.IsTrendBusy), Mode=OneWay}"
+                                                      Width="22" Height="22" />
+                                        <TextBlock Text="{x:Bind ViewModel.Forex.TrendError, Mode=OneWay}"
+                                                   Visibility="{x:Bind StringToVisibility(ViewModel.Forex.TrendError), Mode=OneWay}"
+                                                   Foreground="#FF6B6B"
+                                                   FontSize="12"
+                                                   TextWrapping="Wrap" />
+
+                                        <Border Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasTrendData), Mode=OneWay}"
+                                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="12"
+                                                Padding="12">
+                                            <Canvas x:Name="ForexTrendChartCanvas"
+                                                    Height="160"
+                                                    SizeChanged="ForexTrendChartCanvas_SizeChanged" />
+                                        </Border>
+
+                                        <Grid Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasTrendData), Mode=OneWay}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="ForexTrendDateStart" FontSize="10" Opacity="0.5" />
+                                            <TextBlock x:Name="ForexTrendDateMid" Grid.Column="1" FontSize="10" Opacity="0.5" HorizontalAlignment="Center" />
+                                            <TextBlock x:Name="ForexTrendDateEnd" Grid.Column="2" FontSize="10" Opacity="0.5" HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
                             </Border>
 
                             <!-- Rates table -->
@@ -2204,7 +2588,7 @@
 
                             <!-- Chart canvas -->
                             <Border Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasHistory), Mode=OneWay}"
-                                    Background="{ThemeResource LayerFillColorAltBrush}"
+                                    Background="{ThemeResource LayerFillColorDefaultBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                                     BorderThickness="1" CornerRadius="12" Padding="12">
                                 <Canvas x:Name="ForexChartCanvas"
@@ -2220,13 +2604,11 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock x:Name="ForexChartDateStart"
-                                           Grid.Column="0" FontSize="10" Opacity="0.45" />
+                                           Grid.Column="0" FontSize="10" Opacity="0.5" />
                                 <TextBlock x:Name="ForexChartDateMid"
-                                           Grid.Column="1" FontSize="10" Opacity="0.45"
-                                           HorizontalAlignment="Center" />
+                                           Grid.Column="1" FontSize="10" Opacity="0.5" HorizontalAlignment="Center" />
                                 <TextBlock x:Name="ForexChartDateEnd"
-                                           Grid.Column="2" FontSize="10" Opacity="0.45"
-                                           HorizontalAlignment="Right" />
+                                           Grid.Column="2" FontSize="10" Opacity="0.5" HorizontalAlignment="Right" />
                             </Grid>
 
                         </StackPanel>

@@ -61,6 +61,9 @@ public sealed class RashifalViewModel : BindableBase
 
     public ICommand RefreshCommand { get; }
 
+    public ReadOnlyCollection<ZodiacInfo> AvailableZodiacSigns => ZodiacSigns;
+    public ReadOnlyCollection<RashifalTypeInfo> AvailableRashifalTypes => RashifalTypes;
+
     public string SelectedType
     {
         get => _selectedType;

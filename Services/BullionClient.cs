@@ -25,19 +25,19 @@ public sealed class BullionClient
     }
 
     /// <summary>
-    /// Fetches bullion prices starting from the given AD date.
-    /// The API returns all entries from that date up to today.
+    /// Fetches bullion prices from the API.
     /// </summary>
-    /// <param name="fromDate">The start date (AD). Defaults to 30 days before today if not specified.</param>
+    /// <param name="fromDate">Optional start date (AD). Ignored when <paramref name="includeAllHistory"/> is true.</param>
+    /// <param name="includeAllHistory">When true, omits the from-date query and requests all available history.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task<BullionResponse?> FetchAsync(
         DateOnly? fromDate = null,
+        bool includeAllHistory = false,
         CancellationToken cancellationToken = default)
     {
-        // The original site uses a fixed from-date of 2026-3-16 (no zero-padding).
-        // We replicate that format: YYYY-M-D
-        var date = fromDate ?? GetDefaultFromDate();
-        var url = $"{BullionsBaseUri}?from-date={date.Year}-{date.Month}-{date.Day}";
+        var url = includeAllHistory
+            ? BullionsBaseUri.ToString()
+            : BuildFromDateUrl(fromDate ?? GetDefaultFromDate());
 
         var json = await _httpClient.GetStringAsync(url, cancellationToken);
 
@@ -55,5 +55,11 @@ public sealed class BullionClient
     private static DateOnly GetDefaultFromDate()
     {
         return DateOnly.FromDateTime(DateTime.Today.AddDays(-30));
+    }
+
+    private static string BuildFromDateUrl(DateOnly date)
+    {
+        // API expects YYYY-M-D (without zero-padding).
+        return $"{BullionsBaseUri}?from-date={date.Year}-{date.Month}-{date.Day}";
     }
 }

@@ -46,8 +46,13 @@ public sealed class NepaliPatroApiClient
     /// </summary>
     public async Task<string> FetchShubhaSaitRawJsonAsync(CancellationToken cancellationToken = default)
     {
-        var hexResponse = await _httpClient.GetStringAsync(ShubhaSaitUri, cancellationToken);
-        return DecryptSchemeB(hexResponse);
+        var hexResponse = await _httpClient
+            .GetStringAsync(ShubhaSaitUri, cancellationToken)
+            .ConfigureAwait(false);
+
+        return await Task
+            .Run(() => DecryptSchemeB(hexResponse), cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>

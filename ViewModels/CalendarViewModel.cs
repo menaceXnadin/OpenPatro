@@ -44,6 +44,7 @@ public sealed class CalendarViewModel : BindableBase
         _services = services;
         PreviousMonthCommand = new AsyncRelayCommand(LoadPreviousMonthAsync, () => !IsBusy);
         NextMonthCommand = new AsyncRelayCommand(LoadNextMonthAsync, () => !IsBusy);
+        RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
         SelectDayCommand = new AsyncRelayCommand(SelectDayAsync);
         SaveNoteCommand = new AsyncRelayCommand(SaveNoteAsync, () => SelectedDay is not null);
         OpenMainWindowCommand = new AsyncRelayCommand(async () => await ((App)Application.Current).ShowMainWindowAsync());
@@ -60,6 +61,8 @@ public sealed class CalendarViewModel : BindableBase
     public ICommand NextMonthCommand { get; }
 
     public ICommand SelectDayCommand { get; }
+
+    public ICommand RefreshCommand { get; }
 
     public ICommand SaveNoteCommand { get; }
 
@@ -179,6 +182,7 @@ public sealed class CalendarViewModel : BindableBase
             {
                 ((AsyncRelayCommand)PreviousMonthCommand).NotifyCanExecuteChanged();
                 ((AsyncRelayCommand)NextMonthCommand).NotifyCanExecuteChanged();
+                ((AsyncRelayCommand)RefreshCommand).NotifyCanExecuteChanged();
             }
         }
     }
@@ -206,6 +210,19 @@ public sealed class CalendarViewModel : BindableBase
         {
             await InitializeAsync();
         }
+    }
+
+    public async Task RefreshAsync()
+    {
+        ClearSelection();
+
+        if (_displayYear <= 0 || _displayMonth <= 0)
+        {
+            await InitializeAsync();
+            return;
+        }
+
+        await LoadMonthAsync(_displayYear, _displayMonth);
     }
 
     public async Task LoadMonthAsync(int year, int month)

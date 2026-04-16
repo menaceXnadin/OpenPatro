@@ -37,6 +37,8 @@ namespace OpenPatro
         private bool _suppressDateConverterInputSync;
         private bool _suppressNavCheckedEvents;
         private bool _suppressCalendarNavigationSelectionEvents;
+        private bool _suppressBullionRangeSelectionEvents;
+        private bool _suppressBullionItemsPerPageSelectionEvents;
 
         // ── Cached UI element references ──
         // Resolved once during RootGrid_Loaded instead of calling FindName() repeatedly.
@@ -51,6 +53,8 @@ namespace OpenPatro
 
         // ── Services ──
         private ResizePipeline? _resizePipeline;
+        private readonly System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<BullionChartPoint>> _bullionChartSeries = new(StringComparer.Ordinal);
+        private readonly System.Collections.Generic.Dictionary<string, ToolTip> _bullionChartTooltips = new(StringComparer.Ordinal);
 
         private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
@@ -165,6 +169,10 @@ namespace OpenPatro
             SyncCalendarNavigationSelections();
             UpdateDateConverterMonthLabels();
             SyncDateConverterInputParts();
+            SyncBullionRangeSelection();
+            SyncBullionItemsPerPageSelection();
+            UpdateBullionRangeSummaryLabel();
+            UpdateBullionRowWindowUi();
             UpdateSortIcons();
 
             if (AppWindow.Presenter is OverlappedPresenter presenter)
@@ -182,7 +190,173 @@ namespace OpenPatro
                     DrawForexChart();
                 else if (e.PropertyName == nameof(OpenPatro.ViewModels.ForexViewModel.IsHistoryPanelVisible))
                     UpdateForexHistoryPanelWidth();
+                else if (e.PropertyName == nameof(OpenPatro.ViewModels.ForexViewModel.HasTrendData))
+                    DrawForexTrendChart();
             };
+
+            ViewModel.Bullion.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(OpenPatro.ViewModels.BullionViewModel.DataVersion))
+                {
+                    DrawBullionCharts();
+                    UpdateBullionRangeSummaryLabel();
+                    UpdateBullionRowWindowUi();
+                }
+                else if (e.PropertyName == nameof(OpenPatro.ViewModels.BullionViewModel.SelectedRangeKey))
+                    SyncBullionRangeSelection();
+                else if (e.PropertyName == nameof(OpenPatro.ViewModels.BullionViewModel.IsBusy))
+                    UpdateBullionRowWindowUi();
+            };
+
+            ConfigureBullionChartCanvases();
+        }
+
+        private async void BullionRangePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressBullionRangeSelectionEvents)
+            {
+                return;
+            }
+
+            if (BullionRangePicker.SelectedItem is not ComboBoxItem item || item.Tag is not string key)
+            {
+                return;
+            }
+
+            await ViewModel.Bullion.ApplyRangeAsync(key);
+        }
+
+        private void SyncBullionRangeSelection()
+        {
+            if (BullionRangePicker is null)
+            {
+                return;
+            }
+
+            _suppressBullionRangeSelectionEvents = true;
+            foreach (var item in BullionRangePicker.Items)
+            {
+                if (item is ComboBoxItem combo
+                    && combo.Tag is string tag
+                    && string.Equals(tag, ViewModel.Bullion.SelectedRangeKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    BullionRangePicker.SelectedItem = combo;
+                    _suppressBullionRangeSelectionEvents = false;
+                    return;
+                }
+            }
+
+            BullionRangePicker.SelectedIndex = 0;
+            _suppressBullionRangeSelectionEvents = false;
+        }
+
+        private void UpdateBullionRangeSummaryLabel()
+        {
+            var label = RootGrid?.FindName("BullionRangeSummaryText") as TextBlock;
+            if (label is null)
+            {
+                return;
+            }
+
+            label.Text = ViewModel.Bullion.RangeSummary;
+        }
+
+        private void SyncBullionItemsPerPageSelection()
+        {
+            var picker = RootGrid?.FindName("BullionItemsPerPagePicker") as ComboBox;
+            if (picker is null)
+            {
+                return;
+            }
+
+            _suppressBullionItemsPerPageSelectionEvents = true;
+            foreach (var item in picker.Items)
+            {
+                if (item is ComboBoxItem combo
+                    && combo.Tag is string tag
+                    && int.TryParse(tag, out var pageSize)
+                    && pageSize == ViewModel.Bullion.ItemsPerPage)
+                {
+                    picker.SelectedItem = combo;
+                    _suppressBullionItemsPerPageSelectionEvents = false;
+                    return;
+                }
+            }
+
+            picker.SelectedIndex = 2;
+            _suppressBullionItemsPerPageSelectionEvents = false;
+        }
+
+        private void BullionItemsPerPagePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressBullionItemsPerPageSelectionEvents)
+            {
+                return;
+            }
+
+            if (sender is not ComboBox picker
+                || picker.SelectedItem is not ComboBoxItem combo
+                || combo.Tag is not string tag
+                || !int.TryParse(tag, out var pageSize))
+            {
+                return;
+            }
+
+            ViewModel.Bullion.SetItemsPerPage(pageSize);
+            UpdateBullionRowWindowUi();
+        }
+
+        private void UpdateBullionRowWindowUi()
+        {
+            var summaryLabel = RootGrid?.FindName("BullionRowWindowSummaryText") as TextBlock;
+            if (summaryLabel is not null)
+            {
+                summaryLabel.Text = ViewModel.Bullion.RowWindowSummary;
+            }
+
+            var pageLabel = RootGrid?.FindName("BullionCurrentPageText") as TextBlock;
+            if (pageLabel is not null)
+            {
+                pageLabel.Text = ViewModel.Bullion.CurrentPageLabel;
+            }
+
+            var itemsPerPagePicker = RootGrid?.FindName("BullionItemsPerPagePicker") as ComboBox;
+            if (itemsPerPagePicker is not null)
+            {
+                itemsPerPagePicker.IsEnabled = !ViewModel.Bullion.IsBusy;
+            }
+
+            var prevButton = RootGrid?.FindName("BullionPrevPageButton") as Button;
+            if (prevButton is not null)
+            {
+                prevButton.IsEnabled = ViewModel.Bullion.CanGoToPreviousPage && !ViewModel.Bullion.IsBusy;
+            }
+
+            var nextButton = RootGrid?.FindName("BullionNextPageButton") as Button;
+            if (nextButton is not null)
+            {
+                nextButton.IsEnabled = ViewModel.Bullion.CanGoToNextPage && !ViewModel.Bullion.IsBusy;
+            }
+        }
+
+        private void BullionPrevPageButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel.Bullion.PreviousPageCommand.CanExecute(null))
+            {
+                ViewModel.Bullion.PreviousPageCommand.Execute(null);
+            }
+
+            UpdateBullionRowWindowUi();
+        }
+
+        private void BullionNextPageButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel.Bullion.NextPageCommand.CanExecute(null))
+            {
+                ViewModel.Bullion.NextPageCommand.Execute(null);
+            }
+
+            UpdateBullionRowWindowUi();
         }
 
         private void SidebarLogo_ImageFailed(object sender, ExceptionRoutedEventArgs e)
@@ -298,10 +472,21 @@ namespace OpenPatro
             if (_suppressNavCheckedEvents) return;
             ViewModel.SelectedSection = ShellSection.ShubhaSait;
             UpdateSectionVisibility();
+            _ = InitializeShubhaSaitSectionAsync();
+        }
+
+        private async Task InitializeShubhaSaitSectionAsync()
+        {
             _suppressSaitSelectionEvents = true;
-            await ViewModel.ShubhaSait.InitializeAsync();
-            SyncShubhaSaitSelections();
-            _suppressSaitSelectionEvents = false;
+            try
+            {
+                await ViewModel.ShubhaSait.InitializeAsync();
+                SyncShubhaSaitSelections();
+            }
+            finally
+            {
+                _suppressSaitSelectionEvents = false;
+            }
         }
 
         private void DateConverterButton_Checked(object sender, RoutedEventArgs e)
@@ -1520,6 +1705,11 @@ namespace OpenPatro
             DrawForexChart();
         }
 
+        private void ForexTrendChartCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            DrawForexTrendChart();
+        }
+
         internal void DrawForexChart()
         {
             if (ForexChartCanvas is null) return;
@@ -1604,6 +1794,445 @@ namespace OpenPatro
                 ForexChartDateMid.Text = FormatChartDate(points[points.Count / 2].Date);
             if (ForexChartDateEnd is not null && points.Count > 0)
                 ForexChartDateEnd.Text = FormatChartDate(points[^1].Date);
+        }
+
+        internal void DrawForexTrendChart()
+        {
+            if (ForexTrendChartCanvas is null) return;
+            ForexTrendChartCanvas.Children.Clear();
+
+            var points = ViewModel.Forex.TrendPoints;
+            if (points.Count < 2) return;
+
+            var canvasWidth = ForexTrendChartCanvas.ActualWidth;
+            var canvasHeight = ForexTrendChartCanvas.ActualHeight;
+            if (canvasWidth <= 0 || canvasHeight <= 0) return;
+
+            var values = points.Select(p => (double)p.Buying).ToList();
+            var minVal = values.Min();
+            var maxVal = values.Max();
+            var range = maxVal - minVal;
+            if (range == 0) range = 1;
+
+            const double padTop = 10;
+            const double padBottom = 10;
+            var drawHeight = canvasHeight - padTop - padBottom;
+
+            var polyPoints = new Windows.Foundation.Point[values.Count];
+            for (int i = 0; i < values.Count; i++)
+            {
+                var x = (canvasWidth / (values.Count - 1)) * i;
+                var y = padTop + drawHeight * (1.0 - (values[i] - minVal) / range);
+                polyPoints[i] = new Windows.Foundation.Point(x, y);
+            }
+
+            var fillFigure = new Microsoft.UI.Xaml.Media.PathFigure
+            {
+                StartPoint = new Windows.Foundation.Point(0, canvasHeight)
+            };
+            fillFigure.Segments.Add(new Microsoft.UI.Xaml.Media.LineSegment { Point = polyPoints[0] });
+            foreach (var pt in polyPoints.Skip(1))
+                fillFigure.Segments.Add(new Microsoft.UI.Xaml.Media.LineSegment { Point = pt });
+            fillFigure.Segments.Add(new Microsoft.UI.Xaml.Media.LineSegment
+                { Point = new Windows.Foundation.Point(canvasWidth, canvasHeight) });
+            fillFigure.IsClosed = true;
+
+            var fillGeometry = new Microsoft.UI.Xaml.Media.PathGeometry();
+            fillGeometry.Figures.Add(fillFigure);
+
+            var fillPath = new Microsoft.UI.Xaml.Shapes.Path
+            {
+                Data = fillGeometry,
+                Fill = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Microsoft.UI.ColorHelper.FromArgb(24, 249, 115, 22))
+            };
+            ForexTrendChartCanvas.Children.Add(fillPath);
+
+            var polyline = new Microsoft.UI.Xaml.Shapes.Polyline
+            {
+                Stroke = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    Microsoft.UI.ColorHelper.FromArgb(255, 249, 115, 22)),
+                StrokeThickness = 2,
+                StrokeLineJoin = Microsoft.UI.Xaml.Media.PenLineJoin.Round
+            };
+            foreach (var pt in polyPoints)
+                polyline.Points.Add(pt);
+            ForexTrendChartCanvas.Children.Add(polyline);
+
+            if (ForexTrendDateStart is not null)
+                ForexTrendDateStart.Text = FormatChartDate(points[0].Date);
+            if (ForexTrendDateMid is not null)
+                ForexTrendDateMid.Text = FormatChartDate(points[points.Count / 2].Date);
+            if (ForexTrendDateEnd is not null)
+                ForexTrendDateEnd.Text = FormatChartDate(points[^1].Date);
+        }
+
+        private void ConfigureBullionChartCanvases()
+        {
+            RegisterBullionChartCanvas(BullionHallmarkChartCanvas, "hallmark");
+            RegisterBullionChartCanvas(BullionTejabiChartCanvas, "tejabi");
+            RegisterBullionChartCanvas(BullionSilverChartCanvas, "silver");
+        }
+
+        private void RegisterBullionChartCanvas(Canvas? canvas, string key)
+        {
+            if (canvas is null)
+            {
+                return;
+            }
+
+            canvas.Tag = key;
+
+            canvas.PointerMoved -= BullionChartCanvas_PointerMoved;
+            canvas.PointerMoved += BullionChartCanvas_PointerMoved;
+
+            canvas.PointerExited -= BullionChartCanvas_PointerExited;
+            canvas.PointerExited += BullionChartCanvas_PointerExited;
+
+            var tooltip = new ToolTip
+            {
+                Placement = PlacementMode.Mouse
+            };
+
+            ToolTipService.SetToolTip(canvas, tooltip);
+            _bullionChartTooltips[key] = tooltip;
+        }
+
+        private void BullionChartCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            DrawBullionCharts();
+        }
+
+        private void BullionChartCanvas_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is not Canvas canvas || canvas.Tag is not string key)
+            {
+                return;
+            }
+
+            if (!_bullionChartSeries.TryGetValue(key, out var series) || series.Count == 0)
+            {
+                return;
+            }
+
+            var width = canvas.ActualWidth;
+            if (width <= 0)
+            {
+                return;
+            }
+
+            var position = e.GetCurrentPoint(canvas).Position;
+            var maxIndex = series.Count - 1;
+            var index = maxIndex == 0
+                ? 0
+                : (int)Math.Round((position.X / width) * maxIndex);
+            index = Math.Clamp(index, 0, maxIndex);
+
+            var point = series[index];
+            if (!_bullionChartTooltips.TryGetValue(key, out var tooltip))
+            {
+                return;
+            }
+
+            tooltip.Content = $"{GetBullionSeriesTitle(key)}\nAD: {point.AdDate}\nBS: {point.BsDate}\nPer tola: NPR {point.PerTola}\nPer 10g: NPR {point.Per10g}";
+            tooltip.IsOpen = true;
+        }
+
+        private void BullionChartCanvas_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+        {
+            if (sender is not Canvas canvas || canvas.Tag is not string key)
+            {
+                return;
+            }
+
+            if (_bullionChartTooltips.TryGetValue(key, out var tooltip))
+            {
+                tooltip.IsOpen = false;
+            }
+        }
+
+        internal void DrawBullionCharts()
+        {
+            var allRows = ViewModel.Bullion.ChartRows.Count > 0
+                ? ViewModel.Bullion.ChartRows
+                : ViewModel.Bullion.Rows;
+
+            var rows = allRows
+                .Reverse()
+                .ToList();
+
+            rows = DownsampleRowsForChart(rows, 480);
+
+            var hallmarkSeries = rows
+                .Select(r => new BullionChartPoint(
+                    r.AdDate,
+                    r.BsDate,
+                    r.GoldHallmarkPerTola,
+                    r.GoldHallmarkPer10g,
+                    ParseBullionPrice(r.GoldHallmarkPerTola)))
+                .ToList();
+
+            var tejabiSeries = rows
+                .Select(r => new BullionChartPoint(
+                    r.AdDate,
+                    r.BsDate,
+                    r.GoldTejabiPerTola,
+                    r.GoldTejabiPer10g,
+                    ParseBullionPrice(r.GoldTejabiPerTola)))
+                .ToList();
+
+            var silverSeries = rows
+                .Select(r => new BullionChartPoint(
+                    r.AdDate,
+                    r.BsDate,
+                    r.SilverPerTola,
+                    r.SilverPer10g,
+                    ParseBullionPrice(r.SilverPerTola)))
+                .ToList();
+
+            _bullionChartSeries["hallmark"] = hallmarkSeries;
+            _bullionChartSeries["tejabi"] = tejabiSeries;
+            _bullionChartSeries["silver"] = silverSeries;
+
+            DrawBullionChart(
+                BullionHallmarkChartCanvas,
+                hallmarkSeries,
+                Microsoft.UI.ColorHelper.FromArgb(255, 250, 204, 21),
+                Microsoft.UI.ColorHelper.FromArgb(32, 250, 204, 21));
+
+            DrawBullionChart(
+                BullionTejabiChartCanvas,
+                tejabiSeries,
+                Microsoft.UI.ColorHelper.FromArgb(255, 249, 115, 22),
+                Microsoft.UI.ColorHelper.FromArgb(32, 249, 115, 22));
+
+            DrawBullionChart(
+                BullionSilverChartCanvas,
+                silverSeries,
+                Microsoft.UI.ColorHelper.FromArgb(255, 148, 163, 184),
+                Microsoft.UI.ColorHelper.FromArgb(34, 148, 163, 184));
+
+            SetBullionDateLabels(
+                FindBullionLabel("BullionHallmarkDateStart"),
+                FindBullionLabel("BullionHallmarkDateMid"),
+                FindBullionLabel("BullionHallmarkDateEnd"),
+                hallmarkSeries);
+
+            SetBullionDateLabels(
+                FindBullionLabel("BullionTejabiDateStart"),
+                FindBullionLabel("BullionTejabiDateMid"),
+                FindBullionLabel("BullionTejabiDateEnd"),
+                tejabiSeries);
+
+            SetBullionDateLabels(
+                FindBullionLabel("BullionSilverDateStart"),
+                FindBullionLabel("BullionSilverDateMid"),
+                FindBullionLabel("BullionSilverDateEnd"),
+                silverSeries);
+        }
+
+        private static System.Collections.Generic.List<BullionRowViewModel> DownsampleRowsForChart(
+            System.Collections.Generic.IReadOnlyList<BullionRowViewModel> rows,
+            int maxPoints)
+        {
+            if (rows.Count <= maxPoints || maxPoints < 3)
+            {
+                return rows.ToList();
+            }
+
+            var sampled = new System.Collections.Generic.List<BullionRowViewModel>(maxPoints);
+            var step = (rows.Count - 1d) / (maxPoints - 1d);
+            var previousIndex = -1;
+
+            for (var i = 0; i < maxPoints; i++)
+            {
+                var index = (int)Math.Round(i * step);
+                index = Math.Clamp(index, 0, rows.Count - 1);
+                if (index == previousIndex)
+                {
+                    continue;
+                }
+
+                sampled.Add(rows[index]);
+                previousIndex = index;
+            }
+
+            if (!ReferenceEquals(sampled[^1], rows[^1]))
+            {
+                sampled[^1] = rows[^1];
+            }
+
+            return sampled;
+        }
+
+        private TextBlock? FindBullionLabel(string name)
+        {
+            return RootGrid?.FindName(name) as TextBlock;
+        }
+
+        private static void SetBullionDateLabels(
+            TextBlock? start,
+            TextBlock? mid,
+            TextBlock? end,
+            System.Collections.Generic.IReadOnlyList<BullionChartPoint> series)
+        {
+            if (start is null || mid is null || end is null)
+            {
+                return;
+            }
+
+            if (series.Count == 0)
+            {
+                start.Text = "--";
+                mid.Text = "--";
+                end.Text = "--";
+                return;
+            }
+
+            start.Text = FormatChartDate(series[0].AdDate);
+            mid.Text = FormatChartDate(series[series.Count / 2].AdDate);
+            end.Text = FormatChartDate(series[^1].AdDate);
+        }
+
+        private static string GetBullionSeriesTitle(string key)
+        {
+            return key switch
+            {
+                "hallmark" => "Hallmark Gold",
+                "tejabi" => "Tejabi Gold",
+                "silver" => "Silver",
+                _ => "Bullion"
+            };
+        }
+
+        private static double ParseBullionPrice(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return 0;
+            }
+
+            var clean = value.Replace(",", string.Empty).Trim();
+            if (double.TryParse(clean, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsed))
+            {
+                return parsed;
+            }
+
+            return 0;
+        }
+
+        private static void DrawBullionChart(
+            Canvas? canvas,
+            System.Collections.Generic.IReadOnlyList<BullionChartPoint> series,
+            Windows.UI.Color lineColor,
+            Windows.UI.Color fillColor)
+        {
+            if (canvas is null)
+            {
+                return;
+            }
+
+            canvas.Children.Clear();
+            if (series.Count < 2)
+            {
+                return;
+            }
+
+            var width = canvas.ActualWidth;
+            var height = canvas.ActualHeight;
+            if (width <= 0 || height <= 0)
+            {
+                return;
+            }
+
+            var values = series.Select(p => p.Value).ToList();
+            var min = values.Min();
+            var max = values.Max();
+            var range = max - min;
+            if (range == 0)
+            {
+                range = 1;
+            }
+
+            const double pad = 8;
+            var drawHeight = height - (pad * 2);
+            var points = new Windows.Foundation.Point[values.Count];
+
+            for (var i = 0; i < values.Count; i++)
+            {
+                var x = (width / (values.Count - 1)) * i;
+                var y = pad + drawHeight * (1.0 - (values[i] - min) / range);
+                points[i] = new Windows.Foundation.Point(x, y);
+            }
+
+            var fillFigure = new Microsoft.UI.Xaml.Media.PathFigure
+            {
+                StartPoint = new Windows.Foundation.Point(0, height)
+            };
+            fillFigure.Segments.Add(new Microsoft.UI.Xaml.Media.LineSegment { Point = points[0] });
+            foreach (var pt in points.Skip(1))
+            {
+                fillFigure.Segments.Add(new Microsoft.UI.Xaml.Media.LineSegment { Point = pt });
+            }
+
+            fillFigure.Segments.Add(new Microsoft.UI.Xaml.Media.LineSegment
+            {
+                Point = new Windows.Foundation.Point(width, height)
+            });
+            fillFigure.IsClosed = true;
+
+            var fillGeometry = new Microsoft.UI.Xaml.Media.PathGeometry();
+            fillGeometry.Figures.Add(fillFigure);
+
+            canvas.Children.Add(new Microsoft.UI.Xaml.Shapes.Path
+            {
+                Data = fillGeometry,
+                Fill = new SolidColorBrush(fillColor)
+            });
+
+            var line = new Microsoft.UI.Xaml.Shapes.Polyline
+            {
+                Stroke = new SolidColorBrush(lineColor),
+                StrokeThickness = 2,
+                StrokeLineJoin = Microsoft.UI.Xaml.Media.PenLineJoin.Round
+            };
+            foreach (var pt in points)
+            {
+                line.Points.Add(pt);
+            }
+
+            canvas.Children.Add(line);
+
+            var last = points[^1];
+            var dot = new Microsoft.UI.Xaml.Shapes.Ellipse
+            {
+                Width = 6,
+                Height = 6,
+                Fill = new SolidColorBrush(lineColor)
+            };
+
+            Canvas.SetLeft(dot, last.X - 3);
+            Canvas.SetTop(dot, last.Y - 3);
+            canvas.Children.Add(dot);
+        }
+
+        private sealed class BullionChartPoint
+        {
+            public BullionChartPoint(string adDate, string bsDate, string perTola, string per10g, double value)
+            {
+                AdDate = adDate;
+                BsDate = bsDate;
+                PerTola = perTola;
+                Per10g = per10g;
+                Value = value;
+            }
+
+            public string AdDate { get; }
+            public string BsDate { get; }
+            public string PerTola { get; }
+            public string Per10g { get; }
+            public double Value { get; }
         }
 
         private static string FormatChartDate(string raw)
