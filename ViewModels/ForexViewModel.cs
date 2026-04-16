@@ -7,6 +7,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Imaging;
 using OpenPatro.Infrastructure;
 using OpenPatro.Models;
 
@@ -159,6 +161,8 @@ public sealed class ForexViewModel : BindableBase
     private bool _historyChangeUp;
     private bool _historyChangeDown;
     private string _selectedCurrencyLabel = string.Empty;
+    private string? _selectedCurrencyFlagCdnUrl;
+    private ImageSource? _selectedCurrencyFlagImageSource;
 
     // Converter state
     private ForexCurrencyOption? _converterFromCurrency;
@@ -310,6 +314,18 @@ public sealed class ForexViewModel : BindableBase
     {
         get => _selectedCurrencyLabel;
         private set => SetProperty(ref _selectedCurrencyLabel, value);
+    }
+
+    public string? SelectedCurrencyFlagCdnUrl
+    {
+        get => _selectedCurrencyFlagCdnUrl;
+        private set => SetProperty(ref _selectedCurrencyFlagCdnUrl, value);
+    }
+
+    public ImageSource? SelectedCurrencyFlagImageSource
+    {
+        get => _selectedCurrencyFlagImageSource;
+        private set => SetProperty(ref _selectedCurrencyFlagImageSource, value);
     }
 
     public ForexCurrencyOption? ConverterFromCurrency
@@ -487,7 +503,9 @@ public sealed class ForexViewModel : BindableBase
         }
 
         SelectedCurrency = row;
-        SelectedCurrencyLabel = $"{row.Flag} {row.Currency} ({row.UnitLabel})";
+        SelectedCurrencyLabel = $"{row.Currency} ({row.UnitLabel})";
+        SelectedCurrencyFlagCdnUrl = row.FlagCdnUrl;
+        SelectedCurrencyFlagImageSource = CreateFlagImageSource(row.FlagCdnUrl);
         await LoadHistoryAsync(row);
     }
 
@@ -563,9 +581,26 @@ public sealed class ForexViewModel : BindableBase
     {
         _historyCts?.Cancel();
         SelectedCurrency = null;
+        SelectedCurrencyFlagCdnUrl = null;
+        SelectedCurrencyFlagImageSource = null;
         HasHistory = false;
         HistoryError = string.Empty;
         ChartPoints.Clear();
+    }
+
+    private static ImageSource? CreateFlagImageSource(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return null;
+
+        try
+        {
+            return new BitmapImage(uri);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private void RebuildConverterCurrencies(IList<ForexRateRowViewModel> rows)

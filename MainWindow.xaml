@@ -2515,8 +2515,21 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel>
-                                    <TextBlock Text="{x:Bind ViewModel.Forex.SelectedCurrencyLabel, Mode=OneWay}"
-                                               FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                        <Grid Width="30" Height="22" VerticalAlignment="Center">
+                                            <Image Source="{x:Bind ViewModel.Forex.SelectedCurrencyFlagImageSource, Mode=OneWay}"
+                                                   Stretch="Uniform"
+                                                   ImageOpened="ForexFlagImage_ImageOpened"
+                                                   ImageFailed="ForexFlagImage_ImageFailed"
+                                                   Tag="{x:Bind ViewModel.Forex.SelectedCurrency?.Code, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Bind ViewModel.Forex.SelectedCurrency?.Code, Mode=OneWay}"
+                                                       Visibility="Collapsed"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                        <TextBlock Text="{x:Bind ViewModel.Forex.SelectedCurrencyLabel, Mode=OneWay}"
+                                                   FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                    </StackPanel>
                                     <TextBlock Text="30-day buying rate trend"
                                                FontSize="12" Opacity="0.5" Margin="0,2,0,0" />
                                 </StackPanel>
@@ -2576,10 +2589,10 @@
                                         Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasHistory), Mode=OneWay}">
                                 <TextBlock Text="30d change:"
                                            FontSize="13" Opacity="0.6" VerticalAlignment="Center" />
-                                <TextBlock Text="?"
+                                <TextBlock Text="▲"
                                            FontSize="12" Foreground="#22C55E" VerticalAlignment="Center"
                                            Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HistoryChangeUp), Mode=OneWay}" />
-                                <TextBlock Text="?"
+                                <TextBlock Text="▼"
                                            FontSize="12" Foreground="#EF4444" VerticalAlignment="Center"
                                            Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HistoryChangeDown), Mode=OneWay}" />
                                 <TextBlock Text="{x:Bind ViewModel.Forex.HistoryChange, Mode=OneWay}"
