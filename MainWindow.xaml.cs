@@ -1453,6 +1453,36 @@ namespace OpenPatro
 
         // ── Forex row interaction ──
 
+        private void ForexFlagImage_ImageOpened(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Image image || image.Parent is not Panel panel)
+            {
+                return;
+            }
+
+            image.Visibility = Visibility.Visible;
+            var fallbackText = panel.Children.OfType<TextBlock>().FirstOrDefault();
+            if (fallbackText is not null)
+            {
+                fallbackText.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void ForexFlagImage_ImageFailed(object sender, ExceptionRoutedEventArgs e)
+        {
+            if (sender is not Image image || image.Parent is not Panel panel)
+            {
+                return;
+            }
+
+            image.Visibility = Visibility.Collapsed;
+            var fallbackText = panel.Children.OfType<TextBlock>().FirstOrDefault();
+            if (fallbackText is not null)
+            {
+                fallbackText.Visibility = Visibility.Visible;
+            }
+        }
+
         private void ForexRow_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
         {
             if (sender is Border border)

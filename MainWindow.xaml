@@ -1928,6 +1928,114 @@
                                        Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasData), Mode=OneWay}"
                                        FontSize="12" Opacity="0.45" Margin="0,0,0,4" />
 
+                            <!-- Currency converter -->
+                            <Border Background="{ThemeResource LayerFillColorAltBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="16"
+                                    Padding="16"
+                                    Visibility="{x:Bind BoolToVisibility(ViewModel.Forex.HasData), Mode=OneWay}">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="Currency Converter"
+                                               FontSize="15"
+                                               FontWeight="SemiBold" />
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <ComboBox Header="From"
+                                                  ItemsSource="{x:Bind ViewModel.Forex.SupportedCurrencies, Mode=OneWay}"
+                                                  SelectedItem="{x:Bind ViewModel.Forex.ConverterFromCurrency, Mode=TwoWay}">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="viewmodels:ForexCurrencyOption">
+                                                    <Grid ColumnSpacing="10" MinHeight="28">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Grid Width="28" Height="20" VerticalAlignment="Center">
+                                                            <Image Source="{Binding FlagCdnUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                                                                   Stretch="Uniform"
+                                                                   ImageOpened="ForexFlagImage_ImageOpened"
+                                                                   ImageFailed="ForexFlagImage_ImageFailed"
+                                                                   Tag="{x:Bind Flag}" />
+                                                            <TextBlock Text="{x:Bind Flag}"
+                                                                       Visibility="Collapsed"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center" />
+                                                        </Grid>
+                                                        <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{x:Bind Code}" FontWeight="SemiBold" />
+                                                            <TextBlock Text="{x:Bind Currency}" Opacity="0.68" FontSize="12" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                        <Button Grid.Column="1"
+                                                Command="{x:Bind ViewModel.Forex.SwapCurrenciesCommand, Mode=OneWay}"
+                                                Width="36"
+                                                Height="36"
+                                                Padding="0"
+                                                Margin="0,22,0,0"
+                                                CornerRadius="18"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Top"
+                                                ToolTipService.ToolTip="Swap currencies">
+                                            <TextBlock Text="⇄" FontSize="16" />
+                                        </Button>
+                                        <ComboBox Grid.Column="2"
+                                                  Header="To"
+                                                  ItemsSource="{x:Bind ViewModel.Forex.SupportedCurrencies, Mode=OneWay}"
+                                                  SelectedItem="{x:Bind ViewModel.Forex.ConverterToCurrency, Mode=TwoWay}">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="viewmodels:ForexCurrencyOption">
+                                                    <Grid ColumnSpacing="10" MinHeight="28">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Grid Width="28" Height="20" VerticalAlignment="Center">
+                                                            <Image Source="{Binding FlagCdnUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                                                                   Stretch="Uniform"
+                                                                   ImageOpened="ForexFlagImage_ImageOpened"
+                                                                   ImageFailed="ForexFlagImage_ImageFailed"
+                                                                   Tag="{x:Bind Flag}" />
+                                                            <TextBlock Text="{x:Bind Flag}"
+                                                                       Visibility="Collapsed"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center" />
+                                                        </Grid>
+                                                        <StackPanel Grid.Column="1" Spacing="0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{x:Bind Code}" FontWeight="SemiBold" />
+                                                            <TextBlock Text="{x:Bind Currency}" Opacity="0.68" FontSize="12" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </Grid>
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Header="From amount"
+                                                 PlaceholderText="1"
+                                                 Text="{x:Bind ViewModel.Forex.ConverterFromAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <TextBox Grid.Column="1"
+                                                 Header="To amount"
+                                                 PlaceholderText="0"
+                                                 Text="{x:Bind ViewModel.Forex.ConverterToAmount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    </Grid>
+                                    <TextBlock Text="{x:Bind ViewModel.Forex.ConverterRateSummary, Mode=OneWay}"
+                                               FontSize="12"
+                                               Opacity="0.6" />
+                                </StackPanel>
+                            </Border>
+
                             <!-- Rates table -->
                             <Border Background="{ThemeResource LayerFillColorAltBrush}"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
@@ -1975,7 +2083,18 @@
                                                             <ColumnDefinition Width="90" />
                                                             <ColumnDefinition Width="90" />
                                                         </Grid.ColumnDefinitions>
-                                                        <TextBlock Grid.Column="0" Text="{x:Bind Flag}" FontSize="18" VerticalAlignment="Center" />
+                                                        <Grid Grid.Column="0" Width="28" Height="20" VerticalAlignment="Center">
+                                                            <Image Source="{Binding FlagCdnUrl, Converter={StaticResource StringToImageSourceConverter}}"
+                                                                   Stretch="Uniform"
+                                                                   ImageOpened="ForexFlagImage_ImageOpened"
+                                                                   ImageFailed="ForexFlagImage_ImageFailed"
+                                                                   Tag="{x:Bind Flag}" />
+                                                            <TextBlock Text="{x:Bind Flag}"
+                                                                       FontSize="16"
+                                                                       Visibility="Collapsed"
+                                                                       HorizontalAlignment="Center"
+                                                                       VerticalAlignment="Center" />
+                                                        </Grid>
                                                         <TextBlock Grid.Column="1" Text="{x:Bind Code}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
                                                         <TextBlock Grid.Column="2" Text="{x:Bind Currency}" FontSize="13" Opacity="0.8" VerticalAlignment="Center" />
                                                         <TextBlock Grid.Column="3" Text="{x:Bind UnitLabel}" FontSize="12" Opacity="0.55" HorizontalAlignment="Right" VerticalAlignment="Center" />

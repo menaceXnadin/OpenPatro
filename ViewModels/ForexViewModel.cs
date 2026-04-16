@@ -17,6 +17,8 @@ namespace OpenPatro.ViewModels;
 // ─────────────────────────────────────────────────────────────────────────────
 public sealed class ForexRateRowViewModel
 {
+    private const string FlagCdnBaseUrl = "https://flagcdn.com/w40";
+
     public ForexRateRowViewModel(ForexRateEntry entry)
     {
         Code = entry.Code;
@@ -34,17 +36,20 @@ public sealed class ForexRateRowViewModel
         SellingText = entry.Selling.ToString("N2", CultureInfo.InvariantCulture);
 
         // Flag emoji by currency code
-        Flag = entry.Code switch
-        {
-            "USD" => "🇺🇸", "EUR" => "🇪🇺", "GBP" => "🇬🇧", "INR" => "🇮🇳",
-            "CHF" => "🇨🇭", "AUD" => "🇦🇺", "CAD" => "🇨🇦", "SGD" => "🇸🇬",
-            "JPY" => "🇯🇵", "CNY" => "🇨🇳", "SAR" => "🇸🇦", "QAR" => "🇶🇦",
-            "THB" => "🇹🇭", "AED" => "🇦🇪", "MYR" => "🇲🇾", "KRW" => "🇰🇷",
-            "SEK" => "🇸🇪", "DKK" => "🇩🇰", "HKD" => "🇭🇰", "KWD" => "🇰🇼",
-            "BHD" => "🇧🇭", "OMR" => "🇴🇲",
-            _ => "🏳️"
-        };
+        Flag = GetFlag(entry.Code);
+        FlagCountryCode = GetFlagCountryCode(entry.Code);
     }
+
+    internal static string GetFlag(string code) => code switch
+    {
+        "USD" => "🇺🇸", "EUR" => "🇪🇺", "GBP" => "🇬🇧", "INR" => "🇮🇳",
+        "CHF" => "🇨🇭", "AUD" => "🇦🇺", "CAD" => "🇨🇦", "SGD" => "🇸🇬",
+        "JPY" => "🇯🇵", "CNY" => "🇨🇳", "SAR" => "🇸🇦", "QAR" => "🇶🇦",
+        "THB" => "🇹🇭", "AED" => "🇦🇪", "MYR" => "🇲🇾", "KRW" => "🇰🇷",
+        "SEK" => "🇸🇪", "DKK" => "🇩🇰", "HKD" => "🇭🇰", "KWD" => "🇰🇼",
+        "BHD" => "🇧🇭", "OMR" => "🇴🇲", "NPR" => "🇳🇵",
+        _ => "🏳️"
+    };
 
     public string Code { get; }
     public string Currency { get; }
@@ -56,6 +61,58 @@ public sealed class ForexRateRowViewModel
     public string BuyingText { get; }
     public string SellingText { get; }
     public string Flag { get; }
+    public string? FlagCountryCode { get; }
+    public string? FlagCdnUrl => FlagCountryCode is null ? null : $"{FlagCdnBaseUrl}/{FlagCountryCode}.png";
+
+    internal static string? GetFlagCountryCode(string code) => code switch
+    {
+        "USD" => "us",
+        "EUR" => "eu",
+        "GBP" => "gb",
+        "INR" => "in",
+        "CHF" => "ch",
+        "AUD" => "au",
+        "CAD" => "ca",
+        "SGD" => "sg",
+        "JPY" => "jp",
+        "CNY" => "cn",
+        "SAR" => "sa",
+        "QAR" => "qa",
+        "THB" => "th",
+        "AED" => "ae",
+        "MYR" => "my",
+        "KRW" => "kr",
+        "SEK" => "se",
+        "DKK" => "dk",
+        "HKD" => "hk",
+        "KWD" => "kw",
+        "BHD" => "bh",
+        "OMR" => "om",
+        "NPR" => "np",
+        _ => null
+    };
+}
+
+public sealed class ForexCurrencyOption
+{
+    public ForexCurrencyOption(string code, string currency, int unit, decimal buying)
+    {
+        Code = code;
+        Currency = currency;
+        Unit = unit;
+        Buying = buying;
+        Flag = ForexRateRowViewModel.GetFlag(code);
+    }
+
+    public string Code { get; }
+    public string Currency { get; }
+    public int Unit { get; }
+    public decimal Buying { get; }
+    public string Flag { get; }
+    public string DisplayLabel => $"{Code} · {Currency}";
+    public string? FlagCountryCode => ForexRateRowViewModel.GetFlagCountryCode(Code);
+    public string? FlagCdnUrl => FlagCountryCode is null ? null : $"https://flagcdn.com/w40/{FlagCountryCode}.png";
+    public decimal RatePerUnitNpr => Code == "NPR" ? 1m : (Unit <= 0 ? 0m : Buying / Unit);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,6 +138,8 @@ public sealed class ForexChartPoint
 public sealed class ForexViewModel : BindableBase
 {
     private readonly AppServices _services;
+    private const string DefaultFromCurrencyCode = "USD";
+    private const string DefaultToCurrencyCode = "NPR";
 
     // Today's data
     private bool _isBusy;
@@ -101,6 +160,15 @@ public sealed class ForexViewModel : BindableBase
     private bool _historyChangeDown;
     private string _selectedCurrencyLabel = string.Empty;
 
+    // Converter state
+    private ForexCurrencyOption? _converterFromCurrency;
+    private ForexCurrencyOption? _converterToCurrency;
+    private string _converterFromAmount = "1";
+    private string _converterToAmount = string.Empty;
+    private string _converterRateSummary = string.Empty;
+    private bool _isUpdatingConverterValues;
+    private ConverterInputSide _lastEditedSide = ConverterInputSide.From;
+
     // Cancellation for in-flight history requests
     private CancellationTokenSource? _historyCts;
 
@@ -110,17 +178,22 @@ public sealed class ForexViewModel : BindableBase
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
         SelectCurrencyCommand = new AsyncRelayCommand<ForexRateRowViewModel>(SelectCurrencyAsync);
         CloseHistoryCommand = new RelayCommand(CloseHistory);
+        SwapCurrenciesCommand = new RelayCommand(SwapCurrencies);
     }
 
     public ICommand RefreshCommand { get; }
     public ICommand SelectCurrencyCommand { get; }
     public ICommand CloseHistoryCommand { get; }
+    public ICommand SwapCurrenciesCommand { get; }
 
     /// <summary>All currency rows for today's table.</summary>
     public ObservableCollection<ForexRateRowViewModel> Rates { get; } = new();
 
     /// <summary>Chart data points for the selected currency (oldest → newest).</summary>
     public ObservableCollection<ForexChartPoint> ChartPoints { get; } = new();
+
+    /// <summary>Supported currencies for converter.</summary>
+    public ObservableCollection<ForexCurrencyOption> SupportedCurrencies { get; } = new();
 
     // ── Today's data ──
 
@@ -226,6 +299,58 @@ public sealed class ForexViewModel : BindableBase
         private set => SetProperty(ref _selectedCurrencyLabel, value);
     }
 
+    public ForexCurrencyOption? ConverterFromCurrency
+    {
+        get => _converterFromCurrency;
+        set
+        {
+            if (SetProperty(ref _converterFromCurrency, value))
+                UpdateConversionFromEditedSide();
+        }
+    }
+
+    public ForexCurrencyOption? ConverterToCurrency
+    {
+        get => _converterToCurrency;
+        set
+        {
+            if (SetProperty(ref _converterToCurrency, value))
+                UpdateConversionFromEditedSide();
+        }
+    }
+
+    public string ConverterFromAmount
+    {
+        get => _converterFromAmount;
+        set
+        {
+            if (SetProperty(ref _converterFromAmount, value) && !_isUpdatingConverterValues)
+            {
+                _lastEditedSide = ConverterInputSide.From;
+                UpdateConversionFromEditedSide();
+            }
+        }
+    }
+
+    public string ConverterToAmount
+    {
+        get => _converterToAmount;
+        set
+        {
+            if (SetProperty(ref _converterToAmount, value) && !_isUpdatingConverterValues)
+            {
+                _lastEditedSide = ConverterInputSide.To;
+                UpdateConversionFromEditedSide();
+            }
+        }
+    }
+
+    public string ConverterRateSummary
+    {
+        get => _converterRateSummary;
+        private set => SetProperty(ref _converterRateSummary, value);
+    }
+
     // ── Init / Refresh ──
 
     public async Task InitializeAsync()
@@ -259,6 +384,7 @@ public sealed class ForexViewModel : BindableBase
                 .ToList();
 
             ReplaceCollection(Rates, newRows);
+            RebuildConverterCurrencies(newRows);
             HasData = true;
 
             // If a currency was selected, refresh its history too
@@ -379,6 +505,155 @@ public sealed class ForexViewModel : BindableBase
         HasHistory = false;
         HistoryError = string.Empty;
         ChartPoints.Clear();
+    }
+
+    private void RebuildConverterCurrencies(IList<ForexRateRowViewModel> rows)
+    {
+        var currencies = rows
+            .Select(r => new ForexCurrencyOption(r.Code, r.Currency, r.Unit, r.Buying))
+            .ToList();
+
+        if (!currencies.Any(c => string.Equals(c.Code, "NPR", StringComparison.OrdinalIgnoreCase)))
+            currencies.Add(new ForexCurrencyOption("NPR", "Nepalese Rupee", 1, 1m));
+
+        currencies = currencies
+            .OrderBy(c => c.Code, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        ReplaceCollection(SupportedCurrencies, currencies);
+
+        if (SupportedCurrencies.Count == 0)
+        {
+            ConverterFromCurrency = null;
+            ConverterToCurrency = null;
+            SetConverterToAmountSilently(string.Empty);
+            ConverterRateSummary = string.Empty;
+            return;
+        }
+
+        var fromCode = ConverterFromCurrency?.Code ?? DefaultFromCurrencyCode;
+        var toCode = ConverterToCurrency?.Code ?? DefaultToCurrencyCode;
+
+        ConverterFromCurrency = SupportedCurrencies.FirstOrDefault(c =>
+                string.Equals(c.Code, fromCode, StringComparison.OrdinalIgnoreCase))
+            ?? SupportedCurrencies.FirstOrDefault(c =>
+                string.Equals(c.Code, DefaultFromCurrencyCode, StringComparison.OrdinalIgnoreCase))
+            ?? SupportedCurrencies[0];
+
+        ConverterToCurrency = SupportedCurrencies.FirstOrDefault(c =>
+                string.Equals(c.Code, toCode, StringComparison.OrdinalIgnoreCase))
+            ?? SupportedCurrencies.FirstOrDefault(c =>
+                string.Equals(c.Code, DefaultToCurrencyCode, StringComparison.OrdinalIgnoreCase))
+            ?? SupportedCurrencies[0];
+
+        if (string.IsNullOrWhiteSpace(ConverterFromAmount))
+        {
+            SetConverterFromAmountSilently("1");
+            _lastEditedSide = ConverterInputSide.From;
+        }
+
+        UpdateConversionFromEditedSide();
+    }
+
+    private void SwapCurrencies()
+    {
+        if (ConverterFromCurrency is null || ConverterToCurrency is null)
+        {
+            return;
+        }
+
+        var currentFromCurrency = ConverterFromCurrency;
+        var currentToCurrency = ConverterToCurrency;
+        var currentFromAmount = ConverterFromAmount;
+        var currentToAmount = ConverterToAmount;
+
+        _isUpdatingConverterValues = true;
+        ConverterFromCurrency = currentToCurrency;
+        ConverterToCurrency = currentFromCurrency;
+        SetConverterFromAmountSilently(currentToAmount);
+        SetConverterToAmountSilently(currentFromAmount);
+        _isUpdatingConverterValues = false;
+
+        _lastEditedSide = ConverterInputSide.From;
+        UpdateConversionFromEditedSide();
+    }
+
+    private void UpdateConversionFromEditedSide()
+    {
+        if (ConverterFromCurrency is null || ConverterToCurrency is null)
+        {
+            SetConverterToAmountSilently(string.Empty);
+            ConverterRateSummary = string.Empty;
+            return;
+        }
+
+        var fromRate = ConverterFromCurrency.RatePerUnitNpr;
+        var toRate = ConverterToCurrency.RatePerUnitNpr;
+        if (fromRate <= 0 || toRate <= 0)
+        {
+            ConverterRateSummary = "Rate unavailable";
+            return;
+        }
+
+        var oneUnitRate = fromRate / toRate;
+        ConverterRateSummary = $"1 {ConverterFromCurrency.Code} = {oneUnitRate:N6} {ConverterToCurrency.Code}";
+
+        if (_lastEditedSide == ConverterInputSide.From)
+        {
+            if (!TryParseAmount(ConverterFromAmount, out var amount) || amount <= 0)
+            {
+                SetConverterToAmountSilently(string.Empty);
+                return;
+            }
+
+            var converted = amount * oneUnitRate;
+            SetConverterToAmountSilently(FormatAmount(converted));
+            return;
+        }
+
+        if (!TryParseAmount(ConverterToAmount, out var toAmount) || toAmount <= 0)
+        {
+            SetConverterFromAmountSilently(string.Empty);
+            return;
+        }
+
+        var fromAmount = toAmount / oneUnitRate;
+        SetConverterFromAmountSilently(FormatAmount(fromAmount));
+    }
+
+    private static bool TryParseAmount(string raw, out decimal amount)
+    {
+        if (decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out amount))
+            return true;
+
+        return decimal.TryParse(raw, NumberStyles.Number, CultureInfo.CurrentCulture, out amount);
+    }
+
+    private static string FormatAmount(decimal amount)
+        => amount.ToString("0.####", CultureInfo.InvariantCulture);
+
+    private void SetConverterFromAmountSilently(string value)
+    {
+        if (string.Equals(_converterFromAmount, value, StringComparison.Ordinal))
+            return;
+
+        _converterFromAmount = value;
+        RaisePropertyChanged(nameof(ConverterFromAmount));
+    }
+
+    private void SetConverterToAmountSilently(string value)
+    {
+        if (string.Equals(_converterToAmount, value, StringComparison.Ordinal))
+            return;
+
+        _converterToAmount = value;
+        RaisePropertyChanged(nameof(ConverterToAmount));
+    }
+
+    private enum ConverterInputSide
+    {
+        From,
+        To
     }
 
     // ── Helpers ──
