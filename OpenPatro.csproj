@@ -64,7 +64,10 @@
 
   <ItemGroup>
     <None Include=".github\copilot-instructions.md" Condition="Exists('.github\copilot-instructions.md')" />
-    <None Include=".github\workflows\dotnet-desktop.yml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include=".github\workflows\" />
   </ItemGroup>
 
   <!--
