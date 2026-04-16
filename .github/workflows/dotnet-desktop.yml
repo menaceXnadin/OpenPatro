@@ -1,0 +1,73 @@
+name: Build OpenPatro (WinUI/.NET 8)
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    env:
+      PROJECT_PATH: OpenPatro.csproj
+      CONFIGURATION: Release
+      PLATFORM: x64
+      RUNTIME_IDENTIFIER: win-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore
+        run: dotnet restore $env:PROJECT_PATH
+
+      - name: Build
+        run: msbuild $env:PROJECT_PATH /m /p:Configuration=$env:CONFIGURATION /p:Platform=$env:PLATFORM /p:RuntimeIdentifier=$env:RUNTIME_IDENTIFIER
+
+      - name: Run tests (if any test projects exist)
+        shell: powershell
+        run: |
+          $tests = Get-ChildItem -Recurse -Filter *Tests.csproj | Select-Object -ExpandProperty FullName
+          if (-not $tests) {
+            Write-Host "No test projects found. Skipping tests."
+            exit 0
+          }
+
+          foreach ($test in $tests) {
+            dotnet test $test --configuration $env:CONFIGURATION --no-build --verbosity normal
+          }
+
+      - name: Build MSIX package (unsigned)
+        run: >
+          msbuild $env:PROJECT_PATH
+          /p:Configuration=$env:CONFIGURATION
+          /p:Platform=$env:PLATFORM
+          /p:RuntimeIdentifier=$env:RUNTIME_IDENTIFIER
+          /p:GenerateAppxPackageOnBuild=true
+          /p:AppxPackageSigningEnabled=false
+          /p:UapAppxPackageBuildMode=SideloadOnly
+          /p:AppxBundle=Never
+          /p:AppxPackageDir=AppPackages\
+
+      - name: Upload MSIX artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenPatro-MSIX-${{ env.PLATFORM }}
+          path: |
+            **/AppPackages/**/*.msix
+            **/AppPackages/**/*.msixbundle
+            **/AppPackages/**/*.msixupload
+            **/AppPackages/**/*.appxsym
+            **/AppPackages/**/*.cer
+          if-no-files-found: error
