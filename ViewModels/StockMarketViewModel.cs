@@ -1041,7 +1041,7 @@ public sealed class MarketMoverRowViewModel
 
 public sealed class LiveCompanyRowViewModel
 {
-    public LiveCompanyRowViewModel(string symbol, string securityName, string sector, string open, string high, string low, string ltp, string prevClose, string changePercent, string turnover, string quantity, string transactions, decimal openValue, decimal highValue, decimal lowValue, decimal ltpValue, decimal previousCloseValue, decimal changePercentValue, decimal quantityValue, decimal turnoverValue, int transactionsValue, string? logoPath)
+    public LiveCompanyRowViewModel(string symbol, string securityName, string sector, string open, string high, string low, string ltp, string prevClose, string changePercent, string turnover, string quantity, string transactions, decimal openValue, decimal highValue, decimal lowValue, decimal ltpValue, decimal previousCloseValue, decimal changePercentValue, decimal quantityValue, decimal turnoverValue, decimal transactionsValue, string? logoPath)
     {
         Symbol = symbol;
         SecurityName = securityName;
@@ -1141,7 +1141,7 @@ public sealed class LiveCompanyRowViewModel
 
     public decimal TurnoverValue { get; }
 
-    public int TransactionsValue { get; }
+    public decimal TransactionsValue { get; }
 
     public string RowBackground { get; }
 

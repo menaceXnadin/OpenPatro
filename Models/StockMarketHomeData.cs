@@ -169,7 +169,8 @@ public sealed class LiveCompanyDataInfo
     public decimal TotalTradeQuantity { get; set; }
 
     [JsonPropertyName("totalTransactions")]
-    public int TotalTransactions { get; set; }
+    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+    public decimal TotalTransactions { get; set; }
 
     [JsonPropertyName("lastUpdatedDateTime")]
     public string? LastUpdatedDateTime { get; set; }
