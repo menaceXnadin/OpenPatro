@@ -41,19 +41,19 @@ public sealed class CalendarDayCellViewModel : BindableBase
     // ── Background ──────────────────────────────────────────────────────
     public SolidColorBrush BackgroundBrush => IsSelected
         ? new(SelectedFillColor)
-        : Record.IsHoliday
-            ? new(Color.FromArgb(22, HolidayColor.R, HolidayColor.G, HolidayColor.B))
-            : IsToday
-                ? new(TodayFillColor)
+        : IsToday
+            ? new(TodayFillColor)
+            : Record.IsHoliday
+                ? new(Color.FromArgb(22, HolidayColor.R, HolidayColor.G, HolidayColor.B))
                 : new(Colors.Transparent);
 
     // ── Border ──────────────────────────────────────────────────────────
     public SolidColorBrush BorderBrush => IsSelected
         ? new(SelectedBorderColor)
-        : Record.IsHoliday
-            ? new(Color.FromArgb(48, HolidayColor.R, HolidayColor.G, HolidayColor.B))
-            : IsToday
-                ? new(TodayBorderColor)
+        : IsToday
+            ? new(TodayBorderColor)
+            : Record.IsHoliday
+                ? new(Color.FromArgb(48, HolidayColor.R, HolidayColor.G, HolidayColor.B))
                 : new(Colors.Transparent);
 
     // ── Day number foreground ───────────────────────────────────────────
@@ -63,14 +63,18 @@ public sealed class CalendarDayCellViewModel : BindableBase
             ? new(Color.FromArgb(255, 255, 250, 244))
             : Record.IsHoliday || IsSaturdayColumn
                 ? new(HolidayColor)
-                : new(Color.FromArgb(255, 236, 238, 242));
+                : IsToday
+                    ? new(Color.FromArgb(255, 236, 238, 242))
+                    : new(Color.FromArgb(255, 236, 238, 242));
 
     // ── Event text foreground ───────────────────────────────────────────
     public SolidColorBrush SecondaryForegroundBrush => IsSelected
         ? new(Color.FromArgb(210, 255, 241, 228))
         : Record.IsHoliday || IsSaturdayColumn
             ? new(Color.FromArgb(180, HolidayColor.R, HolidayColor.G, HolidayColor.B))
-            : new(Color.FromArgb(158, 210, 214, 222));
+            : IsToday
+                ? new(Color.FromArgb(158, 210, 214, 222))
+                : new(Color.FromArgb(158, 210, 214, 222));
 
     // ── Tithi / AD-day foreground ───────────────────────────────────────
     public SolidColorBrush TertiaryForegroundBrush => !IsCurrentMonth
@@ -79,7 +83,9 @@ public sealed class CalendarDayCellViewModel : BindableBase
             ? new(Color.FromArgb(170, 255, 236, 220))
             : Record.IsHoliday || IsSaturdayColumn
                 ? new(Color.FromArgb(140, HolidayColor.R, HolidayColor.G, HolidayColor.B))
-                : new(Color.FromArgb(120, 180, 184, 196));
+                : IsToday
+                    ? new(Color.FromArgb(120, 180, 184, 196))
+                    : new(Color.FromArgb(120, 180, 184, 196));
 
     // ── Geometry ────────────────────────────────────────────────────────
     public Thickness BorderThickness => IsSelected || IsToday || Record.IsHoliday
