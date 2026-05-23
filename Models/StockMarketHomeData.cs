@@ -61,6 +61,7 @@ public sealed class MarketSummaryEntry
     public string Name { get; set; } = string.Empty;
 
     [JsonPropertyName("value")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Value { get; set; }
 }
 
@@ -91,12 +92,15 @@ public sealed class MarketIndexInfo
     public string Symbol { get; set; } = string.Empty;
 
     [JsonPropertyName("currentValue")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal CurrentValue { get; set; }
 
     [JsonPropertyName("change")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Change { get; set; }
 
     [JsonPropertyName("changePercent")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal ChangePercent { get; set; }
 
     [JsonPropertyName("sector")]
@@ -112,9 +116,11 @@ public sealed class MarketMoverInfo
     public string Name { get; set; } = string.Empty;
 
     [JsonPropertyName("lastTradedPrice")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal LastTradedPrice { get; set; }
 
     [JsonPropertyName("change")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Change { get; set; }
 
     [JsonPropertyName("changePercent")]
@@ -160,31 +166,38 @@ public sealed class LiveCompanyDataInfo
     public decimal Change { get; set; }
 
     [JsonPropertyName("percentageChange")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal PercentageChange { get; set; }
 
     [JsonPropertyName("totalTradeValue")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal TotalTradeValue { get; set; }
 
     [JsonPropertyName("totalTradeQuantity")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal TotalTradeQuantity { get; set; }
 
     [JsonPropertyName("totalTransactions")]
-    [JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal TotalTransactions { get; set; }
 
     [JsonPropertyName("lastUpdatedDateTime")]
     public string? LastUpdatedDateTime { get; set; }
 
     [JsonPropertyName("openPrice")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal OpenPrice { get; set; }
 
     [JsonPropertyName("highPrice")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal HighPrice { get; set; }
 
     [JsonPropertyName("lowPrice")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal LowPrice { get; set; }
 
     [JsonPropertyName("previousClose")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal PreviousClose { get; set; }
 
     [JsonPropertyName("companyLogo")]
