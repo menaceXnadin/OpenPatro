@@ -75,6 +75,19 @@ public sealed partial class HamroPatroParser
         var bsMonthName = ExtractBsMonthName(bsTextParts[0]);
         var adDate = DateTime.ParseExact(adDateText, "MMMM dd, yyyy", CultureInfo.InvariantCulture);
 
+        // Sanity-check: the NepaliWeekday scraped from the page must agree with what
+        // .NET derives from the parsed AD date.  If they disagree the page layout was
+        // inconsistent (e.g. the popup node belonged to a different day cell) and we
+        // should not trust the parsed AD date at all.
+        var expectedDow = adDate.DayOfWeek;
+        var weekdayConsistent = IsWeekdayConsistent(nepaliWeekday, expectedDow);
+        if (!weekdayConsistent)
+        {
+            throw new InvalidOperationException(
+                $"Weekday mismatch for BS {bsYear}/{bsMonth}/{bsDay}: " +
+                $"page says '{nepaliWeekday}' but AD date {adDate:yyyy-MM-dd} is a {expectedDow}.");
+        }
+
         return new CalendarDayRecord
         {
             BsYear = bsYear,
@@ -92,6 +105,22 @@ public sealed partial class HamroPatroParser
             Panchanga = panchanga,
             DetailsPath = detailsPath,
             IsHoliday = isHoliday
+        };
+    }
+
+    private static bool IsWeekdayConsistent(string nepaliWeekday, DayOfWeek adDayOfWeek)
+    {
+        // Map .NET DayOfWeek to the Nepali weekday substrings used by HamroPatro.
+        return adDayOfWeek switch
+        {
+            DayOfWeek.Sunday    => nepaliWeekday.Contains("आइत",  StringComparison.Ordinal),
+            DayOfWeek.Monday    => nepaliWeekday.Contains("सोम",  StringComparison.Ordinal),
+            DayOfWeek.Tuesday   => nepaliWeekday.Contains("मंगल", StringComparison.Ordinal) || nepaliWeekday.Contains("मङ्गल", StringComparison.Ordinal),
+            DayOfWeek.Wednesday => nepaliWeekday.Contains("बुध",  StringComparison.Ordinal),
+            DayOfWeek.Thursday  => nepaliWeekday.Contains("बिहि", StringComparison.Ordinal) || nepaliWeekday.Contains("बृह", StringComparison.Ordinal),
+            DayOfWeek.Friday    => nepaliWeekday.Contains("शुक्र", StringComparison.Ordinal),
+            DayOfWeek.Saturday  => nepaliWeekday.Contains("शनि",  StringComparison.Ordinal),
+            _                   => false
         };
     }
 

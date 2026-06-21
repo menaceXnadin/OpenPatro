@@ -314,6 +314,11 @@
                                   ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   ScrollViewer.VerticalScrollBarVisibility="Disabled"
                                   ScrollViewer.VerticalScrollMode="Disabled">
+                            <GridView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="7" />
+                                </ItemsPanelTemplate>
+                            </GridView.ItemsPanel>
                             <GridView.ItemContainerStyle>
                                 <Style TargetType="GridViewItem">
                                     <Setter Property="Padding" Value="0" />

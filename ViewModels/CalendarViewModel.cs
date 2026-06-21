@@ -365,55 +365,49 @@ public sealed class CalendarViewModel : BindableBase
     private CalendarDayCellViewModel CreateCell(CalendarDayRecord record, bool isCurrentMonth, CalendarDayRecord? today)
     {
         var isToday = today is not null && today.BsYear == record.BsYear && today.BsMonth == record.BsMonth && today.BsDay == record.BsDay;
+        var weekdayColumnIndex = GetWeekdayColumnIndex(record);
         return new CalendarDayCellViewModel
         {
             Record = record,
             IsCurrentMonth = isCurrentMonth,
             IsToday = isToday,
-            IsSaturdayColumn = GetWeekdayColumnIndex(record) == 6
+            IsSaturdayColumn = weekdayColumnIndex == 6
         };
     }
 
+    /// <summary>
+    /// Returns the 0-based column index (0 = Sunday … 6 = Saturday) for a day record.
+    /// Cross-validates the AD date against the stored Nepali weekday name; if they
+    /// disagree the Nepali weekday name is used as the authoritative source so that a
+    /// single corrupted AdDateIso cannot shift the whole calendar grid.
+    /// </summary>
     private static int GetWeekdayColumnIndex(CalendarDayRecord record)
     {
-        var normalizedWeekday = record.NepaliWeekday.Trim();
-        if (normalizedWeekday.Contains("आइत", StringComparison.Ordinal) || normalizedWeekday.Contains("Sunday", StringComparison.OrdinalIgnoreCase))
+        var nepaliIndex = NepaliWeekdayToIndex(record.NepaliWeekday);
+
+        if (DateOnly.TryParse(record.AdDateIso, CultureInfo.InvariantCulture, DateTimeStyles.None, out var adDate))
         {
-            return 0;
+            var adIndex = (int)adDate.DayOfWeek; // Sunday = 0 … Saturday = 6
+            // If both sources agree, great.  If not, trust the Nepali weekday name
+            // because it is embedded directly in the day cell's popup text and is
+            // harder to corrupt through an off-by-one in the month-level layout.
+            return (nepaliIndex < 0 || nepaliIndex == adIndex) ? adIndex : nepaliIndex;
         }
 
-        if (normalizedWeekday.Contains("सोम", StringComparison.Ordinal) || normalizedWeekday.Contains("Monday", StringComparison.OrdinalIgnoreCase))
-        {
-            return 1;
-        }
+        return nepaliIndex >= 0 ? nepaliIndex : 0;
+    }
 
-        if (normalizedWeekday.Contains("मंगल", StringComparison.Ordinal) || normalizedWeekday.Contains("मङ्गल", StringComparison.Ordinal) || normalizedWeekday.Contains("Tuesday", StringComparison.OrdinalIgnoreCase))
-        {
-            return 2;
-        }
-
-        if (normalizedWeekday.Contains("बुध", StringComparison.Ordinal) || normalizedWeekday.Contains("Wednesday", StringComparison.OrdinalIgnoreCase))
-        {
-            return 3;
-        }
-
-        if (normalizedWeekday.Contains("बिहि", StringComparison.Ordinal) || normalizedWeekday.Contains("बृह", StringComparison.Ordinal) || normalizedWeekday.Contains("Thursday", StringComparison.OrdinalIgnoreCase))
-        {
-            return 4;
-        }
-
-        if (normalizedWeekday.Contains("शुक्र", StringComparison.Ordinal) || normalizedWeekday.Contains("Friday", StringComparison.OrdinalIgnoreCase))
-        {
-            return 5;
-        }
-
-        if (normalizedWeekday.Contains("शनि", StringComparison.Ordinal) || normalizedWeekday.Contains("Saturday", StringComparison.OrdinalIgnoreCase))
-        {
-            return 6;
-        }
-
-        var adDate = DateOnly.Parse(record.AdDateIso, CultureInfo.InvariantCulture);
-        return (int)adDate.DayOfWeek;
+    private static int NepaliWeekdayToIndex(string nepaliWeekday)
+    {
+        var w = nepaliWeekday.Trim();
+        if (w.Contains("आइत",  StringComparison.Ordinal) || w.Contains("Sunday",    StringComparison.OrdinalIgnoreCase)) return 0;
+        if (w.Contains("सोम",  StringComparison.Ordinal) || w.Contains("Monday",    StringComparison.OrdinalIgnoreCase)) return 1;
+        if (w.Contains("मंगल", StringComparison.Ordinal) || w.Contains("मङ्गल",    StringComparison.Ordinal)           || w.Contains("Tuesday",   StringComparison.OrdinalIgnoreCase)) return 2;
+        if (w.Contains("बुध",  StringComparison.Ordinal) || w.Contains("Wednesday", StringComparison.OrdinalIgnoreCase)) return 3;
+        if (w.Contains("बिहि", StringComparison.Ordinal) || w.Contains("बृह",       StringComparison.Ordinal)           || w.Contains("Thursday",  StringComparison.OrdinalIgnoreCase)) return 4;
+        if (w.Contains("शुक्र",StringComparison.Ordinal) || w.Contains("Friday",    StringComparison.OrdinalIgnoreCase)) return 5;
+        if (w.Contains("शनि",  StringComparison.Ordinal) || w.Contains("Saturday",  StringComparison.OrdinalIgnoreCase)) return 6;
+        return -1; // unknown
     }
 
     private void SetTodayRecord(CalendarDayRecord? today)
