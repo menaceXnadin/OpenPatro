@@ -124,15 +124,19 @@ public sealed class MarketMoverInfo
     public decimal Change { get; set; }
 
     [JsonPropertyName("changePercent")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal ChangePercent { get; set; }
 
     [JsonPropertyName("turnover")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Turnover { get; set; }
 
     [JsonPropertyName("sharesTraded")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal SharesTraded { get; set; }
 
     [JsonPropertyName("transactions")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Transactions { get; set; }
 
     [JsonPropertyName("companyLogo")]
@@ -160,9 +164,11 @@ public sealed class LiveCompanyDataInfo
     public string? Sector { get; set; }
 
     [JsonPropertyName("lastTradedPrice")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal LastTradedPrice { get; set; }
 
     [JsonPropertyName("change")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Change { get; set; }
 
     [JsonPropertyName("percentageChange")]

@@ -80,11 +80,11 @@ public sealed class UserRepository
         command.CommandText = """
             SELECT BsYear, BsMonth, BsDay, NoteText
             FROM DayNotes
-            WHERE NoteText LIKE $query
+            WHERE NoteText LIKE $query ESCAPE '\'
             ORDER BY UpdatedAtUtc DESC
             LIMIT 100;
             """;
-        command.Parameters.AddWithValue("$query", $"%{query}%");
+        command.Parameters.AddWithValue("$query", $"%{CalendarRepository.EscapeLikePattern(query)}%");
 
         await using var reader = await command.ExecuteReaderAsync();
         while (await reader.ReadAsync())

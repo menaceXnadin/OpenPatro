@@ -26,6 +26,16 @@ Download the self-contained version of OpenPatro from Google Drive:
 
 - https://drive.google.com/drive/u/4/folders/1W2VYk_C__OXDMFhVb_Ld1-ntxvioIrB0
 
+### "Windows protected your PC" message (safe to skip)
+
+When you run `Setup.exe`, Windows SmartScreen may warn that the app comes from an
+**unknown publisher** and ask "Is it safe to run?". This happens because OpenPatro is
+a free app and is not signed with a paid developer (code-signing) certificate — not
+because anything is wrong with it.
+
+It is safe to continue: click **More info** → **Run anyway**. The installer runs
+per-user (no administrator rights needed) and bundles no ads, trackers, or extra software.
+
 ## What It Is
 
 OpenPatro is a practical Windows desktop companion built for Nepali users who need accurate date, time and cultural context at a glance. It shows Bikram Sambat dates, festival and tithi details, Panchang (astrological) data and daily rashifal, auspicious time (Shubha Sait) windows, NEPSE market snapshots, forex and bullion rates, and provides fast local search and a compact tray UI with offline caching and background synchronization. The app is optimized for low resource use and quick access from the system tray.

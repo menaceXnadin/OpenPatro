@@ -54,19 +54,19 @@ public sealed class ShubhaSaitViewModel : BindableBase
     public ICommand RefreshCommand { get; }
 
     /// <summary>Available BS year strings from the data.</summary>
-    public ObservableCollection<string> AvailableYears { get; } = new();
+    public BulkObservableCollection<string> AvailableYears { get; } = new();
 
     /// <summary>Available category display info for the selected year.</summary>
-    public ObservableCollection<SaitCategoryInfo> AvailableCategories { get; } = new();
+    public BulkObservableCollection<SaitCategoryInfo> AvailableCategories { get; } = new();
 
     /// <summary>Available months for the selected year + category.</summary>
-    public ObservableCollection<SaitMonthInfo> AvailableMonths { get; } = new();
+    public BulkObservableCollection<SaitMonthInfo> AvailableMonths { get; } = new();
 
     /// <summary>Auspicious day numbers for the current selection.</summary>
-    public ObservableCollection<string> AuspiciousDays { get; } = new();
+    public BulkObservableCollection<string> AuspiciousDays { get; } = new();
 
     /// <summary>Month-wise auspicious day groups for the current year + category.</summary>
-    public ObservableCollection<SaitMonthDaysInfo> MonthWiseAuspiciousDays { get; } = new();
+    public BulkObservableCollection<SaitMonthDaysInfo> MonthWiseAuspiciousDays { get; } = new();
 
     public string? SelectedYear
     {
@@ -224,21 +224,21 @@ public sealed class ShubhaSaitViewModel : BindableBase
         _selectedCategoryKey = null;
         _selectedMonth = null;
 
-        AvailableYears.Clear();
-        AvailableCategories.Clear();
-        AvailableMonths.Clear();
-        AuspiciousDays.Clear();
-        MonthWiseAuspiciousDays.Clear();
-
         if (_cachedData is null)
         {
+            AvailableYears.ReplaceAll(Array.Empty<string>());
+            AvailableCategories.ReplaceAll(Array.Empty<SaitCategoryInfo>());
+            AvailableMonths.ReplaceAll(Array.Empty<SaitMonthInfo>());
+            AuspiciousDays.ReplaceAll(Array.Empty<string>());
+            MonthWiseAuspiciousDays.ReplaceAll(Array.Empty<SaitMonthDaysInfo>());
             return;
         }
 
-        foreach (var year in _cachedData.Keys.OrderByDescending(y => y))
-        {
-            AvailableYears.Add(year);
-        }
+        AvailableYears.ReplaceAll(_cachedData.Keys.OrderByDescending(y => y));
+        AvailableCategories.ReplaceAll(Array.Empty<SaitCategoryInfo>());
+        AvailableMonths.ReplaceAll(Array.Empty<SaitMonthInfo>());
+        AuspiciousDays.ReplaceAll(Array.Empty<string>());
+        MonthWiseAuspiciousDays.ReplaceAll(Array.Empty<SaitMonthDaysInfo>());
 
         // Auto-select the first (latest) year
         SelectedYear = AvailableYears.FirstOrDefault();
@@ -249,21 +249,20 @@ public sealed class ShubhaSaitViewModel : BindableBase
         _selectedCategoryKey = null;
         _selectedMonth = null;
 
-        AvailableCategories.Clear();
-        AvailableMonths.Clear();
-        AuspiciousDays.Clear();
-        MonthWiseAuspiciousDays.Clear();
-
         if (_cachedData is null || SelectedYear is null || !_cachedData.ContainsKey(SelectedYear))
         {
+            AvailableCategories.ReplaceAll(Array.Empty<SaitCategoryInfo>());
+            AvailableMonths.ReplaceAll(Array.Empty<SaitMonthInfo>());
+            AuspiciousDays.ReplaceAll(Array.Empty<string>());
+            MonthWiseAuspiciousDays.ReplaceAll(Array.Empty<SaitMonthDaysInfo>());
             return;
         }
 
         var yearData = _cachedData[SelectedYear];
-        foreach (var categoryFullKey in yearData.Keys)
-        {
-            AvailableCategories.Add(new SaitCategoryInfo(categoryFullKey));
-        }
+        AvailableCategories.ReplaceAll(yearData.Keys.Select(key => new SaitCategoryInfo(key)));
+        AvailableMonths.ReplaceAll(Array.Empty<SaitMonthInfo>());
+        AuspiciousDays.ReplaceAll(Array.Empty<string>());
+        MonthWiseAuspiciousDays.ReplaceAll(Array.Empty<SaitMonthDaysInfo>());
 
         // Auto-select the first category
         SelectedCategoryKey = AvailableCategories.FirstOrDefault()?.FullKey;
@@ -273,30 +272,38 @@ public sealed class ShubhaSaitViewModel : BindableBase
     {
         _selectedMonth = null;
 
-        AvailableMonths.Clear();
-        AuspiciousDays.Clear();
-        MonthWiseAuspiciousDays.Clear();
-
         if (_cachedData is null || SelectedYear is null || SelectedCategoryKey is null)
         {
+            AvailableMonths.ReplaceAll(Array.Empty<SaitMonthInfo>());
+            AuspiciousDays.ReplaceAll(Array.Empty<string>());
+            MonthWiseAuspiciousDays.ReplaceAll(Array.Empty<SaitMonthDaysInfo>());
             return;
         }
 
         if (!_cachedData.TryGetValue(SelectedYear, out var yearData) ||
             !yearData.TryGetValue(SelectedCategoryKey, out var monthData))
         {
+            AvailableMonths.ReplaceAll(Array.Empty<SaitMonthInfo>());
+            AuspiciousDays.ReplaceAll(Array.Empty<string>());
+            MonthWiseAuspiciousDays.ReplaceAll(Array.Empty<SaitMonthDaysInfo>());
             return;
         }
 
+        var months = new List<SaitMonthInfo>();
+        var monthWise = new List<SaitMonthDaysInfo>();
         foreach (var monthKey in monthData.Keys.OrderBy(static m => ParseSortableInt(m)))
         {
             var displayName = BsMonthNames.TryGetValue(monthKey, out var name) ? name : $"Month {monthKey}";
-            AvailableMonths.Add(new SaitMonthInfo(monthKey, displayName));
+            months.Add(new SaitMonthInfo(monthKey, displayName));
             if (monthData.TryGetValue(monthKey, out var days))
             {
-                MonthWiseAuspiciousDays.Add(new SaitMonthDaysInfo(monthKey, displayName, days));
+                monthWise.Add(new SaitMonthDaysInfo(monthKey, displayName, days));
             }
         }
+
+        AvailableMonths.ReplaceAll(months);
+        AuspiciousDays.ReplaceAll(Array.Empty<string>());
+        MonthWiseAuspiciousDays.ReplaceAll(monthWise);
 
         // Keep first-month behavior for API/helper compatibility.
         SelectedMonth = AvailableMonths.FirstOrDefault()?.MonthKey;
@@ -304,10 +311,9 @@ public sealed class ShubhaSaitViewModel : BindableBase
 
     private void PopulateDays()
     {
-        AuspiciousDays.Clear();
-
         if (_cachedData is null || SelectedYear is null || SelectedCategoryKey is null || SelectedMonth is null)
         {
+            AuspiciousDays.ReplaceAll(Array.Empty<string>());
             return;
         }
 
@@ -315,13 +321,11 @@ public sealed class ShubhaSaitViewModel : BindableBase
             !yearData.TryGetValue(SelectedCategoryKey, out var monthData) ||
             !monthData.TryGetValue(SelectedMonth, out var days))
         {
+            AuspiciousDays.ReplaceAll(Array.Empty<string>());
             return;
         }
 
-        foreach (var day in days)
-        {
-            AuspiciousDays.Add(day);
-        }
+        AuspiciousDays.ReplaceAll(days);
     }
 
     /// <summary>

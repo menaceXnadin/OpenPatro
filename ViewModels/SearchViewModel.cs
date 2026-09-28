@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -31,7 +32,7 @@ public sealed class SearchViewModel : BindableBase
         };
     }
 
-    public ObservableCollection<SearchResultViewModel> Results { get; } = new();
+    public BulkObservableCollection<SearchResultViewModel> Results { get; } = new();
 
     public ICommand SearchCommand { get; }
 
@@ -96,10 +97,20 @@ public sealed class SearchViewModel : BindableBase
             var days = await _services.CalendarRepository.SearchAsync(trimmedQuery);
             var notes = await _services.UserRepository.SearchNotesAsync(trimmedQuery);
 
+            // A newer keystroke may have started another search while we were
+            // awaiting — drop these stale results instead of overwriting fresh ones.
+            if (!string.Equals(Query, trimmedQuery, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            // Collect matches off-screen, then swap them in with a single UI
+            // notification instead of one per result row.
+            var matches = new List<SearchResultViewModel>();
             foreach (var day in days)
             {
                 notes.TryGetValue($"{day.BsYear}-{day.BsMonth}-{day.BsDay}", out var noteText);
-                Results.Add(new SearchResultViewModel
+                matches.Add(new SearchResultViewModel
                 {
                     Title = day.EventSummary == "--" ? day.BsFullDate : day.EventSummary,
                     Subtitle = $"{day.BsFullDate}  |  {day.AdDateText}",
@@ -110,10 +121,10 @@ public sealed class SearchViewModel : BindableBase
                 });
             }
 
-            foreach (var note in notes.Where(item => Results.All(result => $"{result.BsYear}-{result.BsMonth}-{result.BsDay}" != item.Key)))
+            foreach (var note in notes.Where(item => matches.All(result => $"{result.BsYear}-{result.BsMonth}-{result.BsDay}" != item.Key)))
             {
                 var parts = note.Key.Split('-');
-                Results.Add(new SearchResultViewModel
+                matches.Add(new SearchResultViewModel
                 {
                     Title = "Personal note",
                     Subtitle = note.Key,
@@ -124,7 +135,9 @@ public sealed class SearchViewModel : BindableBase
                 });
             }
 
-            if (Results.Count == 0)
+            Results.ReplaceAll(matches);
+
+            if (matches.Count == 0)
             {
                 StatusMessage = "No results found.";
             }

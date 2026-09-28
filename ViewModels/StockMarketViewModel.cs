@@ -66,25 +66,25 @@ public sealed class StockMarketViewModel : BindableBase
 
     public ICommand RefreshCommand { get; }
 
-    public ObservableCollection<IndexSnapshotViewModel> MajorIndices { get; } = new();
+    public BulkObservableCollection<IndexSnapshotViewModel> MajorIndices { get; } = new();
 
-    public ObservableCollection<IndexSnapshotViewModel> SectorIndices { get; } = new();
+    public BulkObservableCollection<IndexSnapshotViewModel> SectorIndices { get; } = new();
 
-    public ObservableCollection<MarketSummaryRowViewModel> MarketSummaryRows { get; } = new();
+    public BulkObservableCollection<MarketSummaryRowViewModel> MarketSummaryRows { get; } = new();
 
-    public ObservableCollection<MarketMoverRowViewModel> TopGainers { get; } = new();
+    public BulkObservableCollection<MarketMoverRowViewModel> TopGainers { get; } = new();
 
-    public ObservableCollection<MarketMoverRowViewModel> TopLosers { get; } = new();
+    public BulkObservableCollection<MarketMoverRowViewModel> TopLosers { get; } = new();
 
-    public ObservableCollection<MarketMoverRowViewModel> TopTurnover { get; } = new();
+    public BulkObservableCollection<MarketMoverRowViewModel> TopTurnover { get; } = new();
 
-    public ObservableCollection<MarketMoverRowViewModel> TopTradedShares { get; } = new();
+    public BulkObservableCollection<MarketMoverRowViewModel> TopTradedShares { get; } = new();
 
-    public ObservableCollection<MarketMoverRowViewModel> TopTransactions { get; } = new();
+    public BulkObservableCollection<MarketMoverRowViewModel> TopTransactions { get; } = new();
 
-    public ObservableCollection<LiveCompanyRowViewModel> LiveCompanies { get; } = new();
+    public BulkObservableCollection<LiveCompanyRowViewModel> LiveCompanies { get; } = new();
 
-    public ObservableCollection<LiveCompanyRowViewModel> FilteredLiveCompanies { get; } = new();
+    public BulkObservableCollection<LiveCompanyRowViewModel> FilteredLiveCompanies { get; } = new();
 
     private string _liveMarketSearchText = string.Empty;
 
@@ -560,39 +560,11 @@ public sealed class StockMarketViewModel : BindableBase
         SupplySummary = $"Supply entries: {SupplyCount}";
     }
 
-    private static void ReplaceCollection<T>(ObservableCollection<T> target, IEnumerable<T> source)
+    // Every refresh builds brand-new row objects, so item-by-item diffing never
+    // matches — swap the whole list with a single UI notification instead.
+    private static void ReplaceCollection<T>(BulkObservableCollection<T> target, IEnumerable<T> source)
     {
-        var sourceList = source.ToList();
-        
-        // Optimization 1: Skip if collections are identical
-        if (target.Count == sourceList.Count && target.SequenceEqual(sourceList))
-        {
-            return;
-        }
-
-        // Optimization 2: Update in-place when possible to avoid full Clear/Add cycle
-        int i = 0;
-        foreach (var item in sourceList)
-        {
-            if (i < target.Count)
-            {
-                if (!EqualityComparer<T>.Default.Equals(target[i], item))
-                {
-                    target[i] = item;
-                }
-            }
-            else
-            {
-                target.Add(item);
-            }
-            i++;
-        }
-
-        // Remove excess items from the end
-        while (target.Count > sourceList.Count)
-        {
-            target.RemoveAt(target.Count - 1);
-        }
+        target.ReplaceAll(source);
     }
 
     private static void ReplaceFixedCollection<T>(
@@ -822,7 +794,7 @@ public sealed class StockMarketViewModel : BindableBase
         RaisePropertyChanged(nameof(CurrentTopStocksList));
     }
 
-    private void SortTopCollection(ObservableCollection<MarketMoverRowViewModel> target)
+    private void SortTopCollection(BulkObservableCollection<MarketMoverRowViewModel> target)
     {
         var sortedList = target.ToList();
         

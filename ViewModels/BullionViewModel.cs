@@ -112,7 +112,7 @@ public sealed class BullionViewModel : BindableBase
     public ICommand PreviousPageCommand { get; }
 
     /// <summary>Historical rows, newest first.</summary>
-    public ObservableCollection<BullionRowViewModel> Rows { get; } = new();
+    public BulkObservableCollection<BullionRowViewModel> Rows { get; } = new();
 
     public IReadOnlyList<BullionRowViewModel> ChartRows => _allRows;
 
@@ -613,28 +613,8 @@ public sealed class BullionViewModel : BindableBase
         RefreshPaginationCommands();
     }
 
-    private static void ReplaceCollection<T>(ObservableCollection<T> target, IList<T> source)
+    private static void ReplaceCollection<T>(BulkObservableCollection<T> target, IList<T> source)
     {
-        int i = 0;
-        foreach (var item in source)
-        {
-            if (i < target.Count)
-            {
-                if (!EqualityComparer<T>.Default.Equals(target[i], item))
-                {
-                    target[i] = item;
-                }
-            }
-            else
-            {
-                target.Add(item);
-            }
-            i++;
-        }
-
-        while (target.Count > source.Count)
-        {
-            target.RemoveAt(target.Count - 1);
-        }
+        target.ReplaceAll(source);
     }
 }

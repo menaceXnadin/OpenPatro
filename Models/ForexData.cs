@@ -16,9 +16,11 @@ public sealed class ForexRateEntry
     public string Currency { get; init; } = string.Empty;
 
     [JsonPropertyName("buying")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Buying { get; init; }
 
     [JsonPropertyName("selling")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Selling { get; init; }
 
     [JsonPropertyName("unit")]
@@ -53,9 +55,11 @@ public sealed class ForexHistoryEntry
     public string Currency { get; init; } = string.Empty;
 
     [JsonPropertyName("buying")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Buying { get; init; }
 
     [JsonPropertyName("selling")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal Selling { get; init; }
 
     [JsonPropertyName("unit")]

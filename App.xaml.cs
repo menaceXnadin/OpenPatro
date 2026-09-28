@@ -269,6 +269,10 @@ namespace OpenPatro
                 Log($"InitializeTray FAILED: {ex}");
             }
 
+            // The timer method null-guards everything, so starting it here is safe
+            // even if tray setup above failed.
+            EnsureTrayAutoRefreshTimerStarted();
+
             try
             {
                 _dateChangeSubscription = Services.Clock.WatchForDateChange(() =>
@@ -381,7 +385,12 @@ namespace OpenPatro
                 }
 
                 _trayIcon.ToolTipText = today.BsFullDate;
-                _trayIcon.Icon = TrayIconGlyphFactory.CreateIcon(today.BsDayText, today.IsHoliday);
+                var newIcon = TrayIconGlyphFactory.CreateIcon(today.BsDayText, today.IsHoliday);
+                var oldIcon = _trayIcon.Icon;
+                _trayIcon.Icon = newIcon;
+                // The factory hands us an owned handle each refresh — release the
+                // previous one or icons (native + managed) leak ~once a minute.
+                oldIcon?.Dispose();
 
                 if (_todayMenuItem is not null)
                 {
@@ -397,26 +406,6 @@ namespace OpenPatro
             {
                 Log($"RefreshTray FAILED: {ex}");
             }
-        }
-
-        private static string GetTrayMonthAbbreviation(int bsMonth)
-        {
-            return bsMonth switch
-            {
-                1 => "बैशाख",
-                2 => "जेठ",
-                3 => "असार",
-                4 => "साउन",
-                5 => "भदौ",
-                6 => "असोज",
-                7 => "कात्तिक",
-                8 => "मंसिर",
-                9 => "पुष",
-                10 => "माघ",
-                11 => "फाल्गुन",
-                12 => "चैत",
-                _ => string.Empty
-            };
         }
 
         public void ExitApplication()
@@ -504,7 +493,13 @@ namespace OpenPatro
             };
             _startupMenuItem.Click += StartupMenuItem_Click;
 
-            var contextMenu = new MenuFlyout();
+            var contextMenu = new MenuFlyout
+            {
+                // Tray menus must open upward: the icon sits on the taskbar, so the
+                // default downward placement drops the menu behind the taskbar and
+                // buries the bottom items (e.g. Exit).
+                Placement = FlyoutPlacementMode.Top
+            };
             var openItem = new MenuFlyoutItem
             {
                 Text = "Open Calendar",
@@ -524,7 +519,14 @@ namespace OpenPatro
             contextMenu.Items.Add(new MenuFlyoutSeparator());
             contextMenu.Items.Add(exitItem);
 
-            var showTodayCommand = new RelayCommand(() => _ = ShowTodayFromTrayAsync());
+            // Left-click toggles the mini calendar popup. (Previous behavior was a
+            // "today" balloon notification via ShowTodayFromTrayAsync — kept below
+            // in case we want to switch back.)
+            var togglePopupCommand = new RelayCommand(() =>
+            {
+                Log("TrayPopup: left-click received");
+                _ = SafeToggleTrayPopupAsync();
+            });
 
             var faviconPath = Path.Combine(AppContext.BaseDirectory, "favicon.ico");
             var initialIcon = File.Exists(faviconPath)
@@ -537,7 +539,7 @@ namespace OpenPatro
                 Icon = initialIcon,
                 ContextFlyout = contextMenu,
                 TrayPopup = null,
-                LeftClickCommand = showTodayCommand,
+                LeftClickCommand = togglePopupCommand,
                 // Double-click behavior is intentionally disabled; users can open
                 // the main window from the right-click menu.
                 NoLeftClickDelay = true
@@ -547,6 +549,18 @@ namespace OpenPatro
             SetEnumProperty(_trayIcon, "PopupActivation", "None");
             SetEnumProperty(_trayIcon, "ContextMenuMode", "SecondWindow");
             _trayIcon.ForceCreate(false);
+
+            // Pre-create and park the popup now so the first left-click shows it
+            // instantly instead of building the HWND + restyling on demand
+            // (that on-demand path caused first-open flicker/position jumps).
+            try
+            {
+                GetOrCreateTrayPopupWindow().Bootstrap();
+            }
+            catch (Exception ex)
+            {
+                Log($"TrayPopup bootstrap FAILED: {ex}");
+            }
         }
 
         private async Task ShowTodayFromTrayAsync()
@@ -710,10 +724,6 @@ namespace OpenPatro
         private async Task ToggleTrayPopupWindowCoreAsync()
         {
             Log("TrayPopup: toggle requested");
-            if (_trayCalendarViewModel is not null)
-            {
-                await _trayCalendarViewModel.EnsureLoadedAsync();
-            }
 
             // If the existing popup window's HWND has been destroyed, recreate it.
             if (_trayPopupWindow is not null)
@@ -735,9 +745,23 @@ namespace OpenPatro
                 return;
             }
 
+            if (popupWindow.WasRecentlyDismissedByOutsideClick())
+            {
+                // The dismiss hook already hid the popup for this very click
+                // (the tray icon is outside the popup). Showing now would just
+                // re-open what the user closed — treat the toggle as handled.
+                Log("TrayPopup: show suppressed, same click just dismissed it");
+                return;
+            }
+
             try
             {
                 Log("TrayPopup: showing");
+                // Show FIRST, synchronously inside the click dispatch, so the window
+                // can take foreground while the tray-click input context is still
+                // valid. Awaiting data load before showing expired that context, so
+                // Windows refused foreground and the popup instantly auto-hid.
+                // Data loads right after and fills in live via bindings.
                 popupWindow.ShowPopup();
                 Log("TrayPopup: shown OK");
             }
@@ -754,6 +778,18 @@ namespace OpenPatro
                 popupWindow = GetOrCreateTrayPopupWindow();
                 popupWindow.ShowPopup();
                 Log("TrayPopup: shown OK after recreate");
+            }
+
+            if (_trayCalendarViewModel is not null)
+            {
+                try
+                {
+                    await _trayCalendarViewModel.EnsureLoadedAsync();
+                }
+                catch (Exception ex)
+                {
+                    Log($"TrayPopup data load FAILED: {ex}");
+                }
             }
         }
 
@@ -903,7 +939,7 @@ namespace OpenPatro
             ExitApplication();
         }
 
-        private static void Log(string message)
+        internal static void Log(string message)
         {
             try
             {

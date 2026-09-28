@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace OpenPatro.Services;
 
@@ -14,9 +15,32 @@ public static class TrayIconGlyphFactory
 {
     private static PrivateFontCollection? _fontCollection;
 
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyIcon(IntPtr hIcon);
+
     public static Icon CreateIcon(string text, bool isHoliday)
     {
         return CreateIcon(text, null, isHoliday);
+    }
+
+    /// <summary>
+    /// Wraps a raw HICON in an <see cref="Icon"/> that owns its handle.
+    /// <see cref="Icon.FromHandle"/> does NOT take ownership, so without the
+    /// clone + destroy the native handle leaks on every call (this factory runs
+    /// on every tray refresh, i.e. roughly once a minute for the app's lifetime).
+    /// </summary>
+    private static Icon OwnHicon(Bitmap bitmap)
+    {
+        var hIcon = bitmap.GetHicon();
+        try
+        {
+            return (Icon)Icon.FromHandle(hIcon).Clone();
+        }
+        finally
+        {
+            DestroyIcon(hIcon);
+        }
     }
 
     /// <summary>
@@ -67,7 +91,7 @@ public static class TrayIconGlyphFactory
             }
 
             graphics.DrawString(dayText, font, brush, textBounds, format);
-            return Icon.FromHandle(bitmap.GetHicon());
+            return OwnHicon(bitmap);
         }
 
         // Day gets the top ~55%, month gets the bottom ~45%.
@@ -92,7 +116,7 @@ public static class TrayIconGlyphFactory
         graphics.DrawString(dayText, dayFont, brush, dayBounds, format);
         graphics.DrawString(monthText, monthFont, brush, monthBounds, format);
 
-        return Icon.FromHandle(bitmap.GetHicon());
+        return OwnHicon(bitmap);
     }
 
     private static FontFamily GetFontFamily()

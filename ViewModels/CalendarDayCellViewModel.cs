@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
@@ -34,7 +35,9 @@ public sealed class CalendarDayCellViewModel : BindableBase
 
     public string EventText => Record.EventSummary == "--" ? string.Empty : Record.EventSummary;
 
-    public string AdDayText => DateOnly.Parse(Record.AdDateIso).Day.ToString();
+    public string AdDayText => DateOnly.TryParse(Record.AdDateIso, CultureInfo.InvariantCulture, DateTimeStyles.None, out var adDate)
+        ? adDate.Day.ToString(CultureInfo.InvariantCulture)
+        : string.Empty;
 
     public double CellOpacity => IsCurrentMonth ? 1.0 : 0.28;
 

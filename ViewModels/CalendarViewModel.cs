@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
@@ -50,11 +51,11 @@ public sealed class CalendarViewModel : BindableBase
         OpenMainWindowCommand = new AsyncRelayCommand(async () => await ((App)Application.Current).ShowMainWindowAsync());
     }
 
-    public ObservableCollection<CalendarDayCellViewModel> Days { get; } = new();
+    public BulkObservableCollection<CalendarDayCellViewModel> Days { get; } = new();
 
-    public ObservableCollection<int> AvailableYears { get; } = new();
+    public BulkObservableCollection<int> AvailableYears { get; } = new();
 
-    public ObservableCollection<MonthNavigationOption> AvailableMonths { get; } = new();
+    public BulkObservableCollection<MonthNavigationOption> AvailableMonths { get; } = new();
 
     public ICommand PreviousMonthCommand { get; }
 
@@ -233,14 +234,24 @@ public sealed class CalendarViewModel : BindableBase
             _displayYear = year;
             _displayMonth = month;
 
-            // Try to sync from network, but don't let failures block the UI.
+            // Sync missing months from network, but don't let failures block the UI.
+            // Months already in the local DB are skipped entirely (no network hit),
+            // and missing ones are fetched in parallel instead of one by one.
             var previous = CalendarSyncService.GetPreviousMonth(year, month);
             var next = CalendarSyncService.GetNextMonth(year, month);
             try
             {
-                await _services.CalendarSync.EnsureMonthPresentAsync(year, month);
-                await _services.CalendarSync.EnsureMonthPresentAsync(previous.year, previous.month);
-                await _services.CalendarSync.EnsureMonthPresentAsync(next.year, next.month);
+                var targets = new[] { (year, month), (previous.year, previous.month), (next.year, next.month) };
+                var missing = new List<(int Year, int Month)>();
+                foreach (var (targetYear, targetMonth) in targets)
+                {
+                    if (!await _services.CalendarRepository.HasMonthAsync(targetYear, targetMonth))
+                    {
+                        missing.Add((targetYear, targetMonth));
+                    }
+                }
+
+                await Task.WhenAll(missing.Select(t => _services.CalendarSync.EnsureMonthPresentAsync(t.Year, t.Month)));
             }
             catch
             {
@@ -263,30 +274,31 @@ public sealed class CalendarViewModel : BindableBase
             var today = await _services.CalendarRepository.GetTodayAsync();
             SetTodayRecord(today);
 
-            Days.Clear();
-
-            if (currentMonthDays.Count == 0)
+            // Build the 42 cells off-screen, then swap them in with a single UI
+            // notification instead of ~43 (Clear + one Add per cell).
+            var cells = new List<CalendarDayCellViewModel>();
+            if (currentMonthDays.Count != 0)
             {
-                return;
+                var leadingDays = GetWeekdayColumnIndex(currentMonthDays[0]);
+                foreach (var day in previousMonthDays.Skip(Math.Max(0, previousMonthDays.Count - leadingDays)))
+                {
+                    cells.Add(CreateCell(day, false, today));
+                }
+
+                foreach (var day in currentMonthDays)
+                {
+                    cells.Add(CreateCell(day, true, today));
+                }
+
+                var trailingIndex = 0;
+                while (cells.Count < 42 && trailingIndex < nextMonthDays.Count)
+                {
+                    cells.Add(CreateCell(nextMonthDays[trailingIndex], false, today));
+                    trailingIndex++;
+                }
             }
 
-            var leadingDays = GetWeekdayColumnIndex(currentMonthDays[0]);
-            foreach (var day in previousMonthDays.Skip(Math.Max(0, previousMonthDays.Count - leadingDays)))
-            {
-                Days.Add(CreateCell(day, false, today));
-            }
-
-            foreach (var day in currentMonthDays)
-            {
-                Days.Add(CreateCell(day, true, today));
-            }
-
-            var trailingIndex = 0;
-            while (Days.Count < 42 && trailingIndex < nextMonthDays.Count)
-            {
-                Days.Add(CreateCell(nextMonthDays[trailingIndex], false, today));
-                trailingIndex++;
-            }
+            Days.ReplaceAll(cells);
         }
         finally
         {
@@ -420,42 +432,40 @@ public sealed class CalendarViewModel : BindableBase
     private async Task RefreshNavigationOptionsAsync(int year, int month)
     {
         var years = await _services.CalendarRepository.GetAvailableBsYearsAsync();
-        AvailableYears.Clear();
-        foreach (var y in years)
+        var yearList = years.ToList();
+        if (!yearList.Contains(year))
         {
-            AvailableYears.Add(y);
+            yearList.Add(year);
         }
 
-        if (!AvailableYears.Contains(year))
-        {
-            AvailableYears.Add(year);
-        }
+        AvailableYears.ReplaceAll(yearList);
 
         var monthRecords = await _services.CalendarRepository.GetAvailableMonthsForYearAsync(year);
-        AvailableMonths.Clear();
-
+        List<MonthNavigationOption> monthList;
         if (monthRecords.Count > 0)
         {
-            foreach (var m in monthRecords)
-            {
-                AvailableMonths.Add(new MonthNavigationOption
+            monthList = monthRecords
+                .Select(m => new MonthNavigationOption
                 {
                     MonthNumber = m.BsMonth,
                     DisplayName = m.TitleNepali
-                });
-            }
+                })
+                .ToList();
         }
         else
         {
+            monthList = new List<MonthNavigationOption>();
             for (var i = 1; i <= 12; i++)
             {
-                AvailableMonths.Add(new MonthNavigationOption
+                monthList.Add(new MonthNavigationOption
                 {
                     MonthNumber = i,
                     DisplayName = NepaliMonthNames[i - 1]
                 });
             }
         }
+
+        AvailableMonths.ReplaceAll(monthList);
 
         SelectedNavigationYear = year;
         SelectedNavigationMonth = AvailableMonths.FirstOrDefault(m => m.MonthNumber == month)

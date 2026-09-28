@@ -14,26 +14,32 @@ public sealed class BullionDayEntry
 
     /// <summary>Hallmark gold price per 10 gram (in NPR)</summary>
     [JsonPropertyName("g_ha")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal GoldHallmarkPer10g { get; init; }
 
     /// <summary>Tejabi gold price per 10 gram (in NPR)</summary>
     [JsonPropertyName("g_te")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal GoldTejabiPer10g { get; init; }
 
     /// <summary>Silver price per 10 gram (in NPR)</summary>
     [JsonPropertyName("g_s")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal SilverPer10g { get; init; }
 
     /// <summary>Hallmark gold price per tola (in NPR)</summary>
     [JsonPropertyName("t_ha")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal GoldHallmarkPerTola { get; init; }
 
     /// <summary>Tejabi gold price per tola (in NPR)</summary>
     [JsonPropertyName("t_te")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal GoldTejabiPerTola { get; init; }
 
     /// <summary>Silver price per tola (in NPR)</summary>
     [JsonPropertyName("t_s")]
+    [JsonConverter(typeof(SafeDecimalJsonConverter))]
     public decimal SilverPerTola { get; init; }
 }
 

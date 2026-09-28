@@ -40,32 +40,6 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Spacing="2">
-                    <TextBlock Text="{Binding TodayBsFullDate}"
-                               FontFamily="{StaticResource AppNepaliFontFamily}"
-                               FontSize="24"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TrayPopupTextBrush}"
-                               TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding TodayAdDateText}"
-                               FontSize="14"
-                               Foreground="{StaticResource TrayPopupMutedBrush}" />
-                </StackPanel>
-
-                <Button Grid.Column="1"
-                        Style="{StaticResource TrayPopupIconButtonStyle}"
-                        Command="{Binding OpenMainWindowCommand}"
-                        ToolTipService.ToolTip="Open full app">
-                    <FontIcon Glyph="&#xE8A7;" FontSize="16" />
-                </Button>
-            </Grid>
-
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-
                 <StackPanel>
                     <TextBlock Text="{Binding MonthTitleNepali}"
                                FontFamily="{StaticResource AppNepaliFontFamily}"
@@ -80,6 +54,11 @@
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
                             Spacing="8">
+                    <Button Command="{Binding OpenMainWindowCommand}"
+                            Style="{StaticResource TrayPopupIconButtonStyle}"
+                            ToolTipService.ToolTip="Open full app">
+                        <FontIcon Glyph="&#xE8A7;" FontSize="16" />
+                    </Button>
                     <Button Command="{Binding PreviousMonthCommand}" Style="{StaticResource TrayPopupIconButtonStyle}">
                         <FontIcon Glyph="&#xE76B;" FontSize="13" />
                     </Button>
@@ -113,6 +92,7 @@
 
             <GridView x:Name="CalendarDaysGrid"
                       Width="336"
+                      Height="336"
                       HorizontalAlignment="Center"
                       ItemsSource="{Binding Days}"
                       IsItemClickEnabled="True"

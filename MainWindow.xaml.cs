@@ -127,6 +127,22 @@ namespace OpenPatro
 
             // Cache UI element references once — eliminates repeated FindName() calls.
             CacheUiReferences();
+
+            // The 7×6 grid is sized from measured host bounds, so recompute whenever
+            // the inputs to that math change, not just on window resize:
+            //  - Day cells arrive asynchronously after the DB load; without this the
+            //    grid keeps content auto-sizing (cramped cells, clipped last row)
+            //    until the next manual resize.
+            //  - Host size changes when switching back to the calendar section or on
+            //    maximize/restore transitions.
+            // Both funnel through the debounced pipeline; the month-load burst of
+            // ~42 collection events collapses into a single recompute.
+            ViewModel.Calendar.Days.CollectionChanged += (_, _) => _resizePipeline?.RequestLayout();
+            if (_calendarLayoutHost is not null)
+            {
+                _calendarLayoutHost.SizeChanged += (_, _) => _resizePipeline?.RequestLayout();
+            }
+
             ApplySidebarLogo();
 
             ConfigureWindowResizeBehavior();
@@ -467,7 +483,7 @@ namespace OpenPatro
             await ViewModel.Rashifal.InitializeAsync();
         }
 
-        private async void ShubhaSaitButton_Checked(object sender, RoutedEventArgs e)
+        private void ShubhaSaitButton_Checked(object sender, RoutedEventArgs e)
         {
             if (_suppressNavCheckedEvents) return;
             ViewModel.SelectedSection = ShellSection.ShubhaSait;
@@ -808,6 +824,10 @@ namespace OpenPatro
 
             var headerHeight = _weekdayHeaderBorder?.ActualHeight
                                ?? _weekdayHeaderGrid.ActualHeight;
+            if (headerHeight <= 0)
+            {
+                headerHeight = WindowLayoutService.FallbackWeekdayHeaderHeightDip;
+            }
 
             var metrics = WindowLayoutService.ComputeCalendarGridMetrics(
                 _calendarLayoutHost.ActualWidth, _calendarLayoutHost.ActualHeight, headerHeight);

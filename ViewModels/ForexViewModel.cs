@@ -201,16 +201,16 @@ public sealed class ForexViewModel : BindableBase
     public ICommand SetTrendRangeCommand { get; }
 
     /// <summary>All currency rows for today's table.</summary>
-    public ObservableCollection<ForexRateRowViewModel> Rates { get; } = new();
+    public BulkObservableCollection<ForexRateRowViewModel> Rates { get; } = new();
 
     /// <summary>Chart data points for the selected currency (oldest → newest).</summary>
-    public ObservableCollection<ForexChartPoint> ChartPoints { get; } = new();
+    public BulkObservableCollection<ForexChartPoint> ChartPoints { get; } = new();
 
     /// <summary>Supported currencies for converter.</summary>
-    public ObservableCollection<ForexCurrencyOption> SupportedCurrencies { get; } = new();
+    public BulkObservableCollection<ForexCurrencyOption> SupportedCurrencies { get; } = new();
 
     /// <summary>Chart data points for the selected trend currency and range.</summary>
-    public ObservableCollection<ForexChartPoint> TrendPoints { get; } = new();
+    public BulkObservableCollection<ForexChartPoint> TrendPoints { get; } = new();
 
     // ── Today's data ──
 
@@ -519,7 +519,6 @@ public sealed class ForexViewModel : BindableBase
         IsHistoryBusy = true;
         HistoryError = string.Empty;
         HasHistory = false;
-        ChartPoints.Clear();
 
         try
         {
@@ -531,6 +530,7 @@ public sealed class ForexViewModel : BindableBase
 
             if (history.Count == 0)
             {
+                ChartPoints.ReplaceAll(Array.Empty<ForexChartPoint>());
                 HistoryError = "No history available for this currency.";
                 return;
             }
@@ -542,8 +542,7 @@ public sealed class ForexViewModel : BindableBase
                 .OrderBy(h => h.AddedDate)
                 .ToList();
 
-            foreach (var pt in deduped)
-                ChartPoints.Add(new ForexChartPoint(pt.AddedDate, pt.Buying, pt.Selling));
+            ChartPoints.ReplaceAll(deduped.Select(pt => new ForexChartPoint(pt.AddedDate, pt.Buying, pt.Selling)));
 
             // Stats
             var buyingValues = deduped.Select(h => h.Buying).ToList();
@@ -768,7 +767,6 @@ public sealed class ForexViewModel : BindableBase
         IsTrendBusy = true;
         TrendError = string.Empty;
         HasTrendData = false;
-        TrendPoints.Clear();
 
         try
         {
@@ -787,6 +785,7 @@ public sealed class ForexViewModel : BindableBase
 
             if (history.Count == 0)
             {
+                TrendPoints.ReplaceAll(Array.Empty<ForexChartPoint>());
                 TrendError = "No trend data available for this currency and range.";
                 return;
             }
@@ -797,8 +796,7 @@ public sealed class ForexViewModel : BindableBase
                 .OrderBy(h => h.AddedDate)
                 .ToList();
 
-            foreach (var pt in deduped)
-                TrendPoints.Add(new ForexChartPoint(pt.AddedDate, pt.Buying, pt.Selling));
+            TrendPoints.ReplaceAll(deduped.Select(pt => new ForexChartPoint(pt.AddedDate, pt.Buying, pt.Selling)));
 
             HasTrendData = TrendPoints.Count > 1;
             if (!HasTrendData)
@@ -853,24 +851,9 @@ public sealed class ForexViewModel : BindableBase
         return raw;
     }
 
-    private static void ReplaceCollection<T>(ObservableCollection<T> target, IList<T> source)
+    private static void ReplaceCollection<T>(BulkObservableCollection<T> target, IList<T> source)
     {
-        int i = 0;
-        foreach (var item in source)
-        {
-            if (i < target.Count)
-            {
-                if (!EqualityComparer<T>.Default.Equals(target[i], item))
-                    target[i] = item;
-            }
-            else
-            {
-                target.Add(item);
-            }
-            i++;
-        }
-        while (target.Count > source.Count)
-            target.RemoveAt(target.Count - 1);
+        target.ReplaceAll(source);
     }
 }
 

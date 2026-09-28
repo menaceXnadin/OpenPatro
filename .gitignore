@@ -2,6 +2,9 @@
 bin/
 obj/
 
+# Installer build output (compiled Setup.exe)
+installer/Output/
+
 # IDE/editor
 .vs/
 *.user

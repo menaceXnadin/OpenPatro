@@ -215,21 +215,21 @@ public sealed class CalendarRepository
 
         var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT BsYear, BsMonth, BsDay, BsDayText, BsMonthName, BsFullDate, NepaliWeekday,
+             SELECT BsYear, BsMonth, BsDay, BsDayText, BsMonthName, BsFullDate, NepaliWeekday,
                    AdDateIso, AdDateText, EventSummary, Tithi, LunarText, Panchanga, DetailsPath, IsHoliday
-            FROM CalendarDays
-             WHERE EventSummary LIKE $query
-             OR Panchanga LIKE $query
-             OR Tithi LIKE $query
-             OR BsFullDate LIKE $query
-             OR AdDateText LIKE $query
-             OR AdDateIso = $adDateIso
-             OR NepaliWeekday LIKE $query
-             OR BsMonthName LIKE $query
-            ORDER BY AdDateIso DESC
-            LIMIT 100;
-            """;
-        command.Parameters.AddWithValue("$query", $"%{trimmedQuery}%");
+             FROM CalendarDays
+              WHERE EventSummary LIKE $query ESCAPE '\'
+              OR Panchanga LIKE $query ESCAPE '\'
+              OR Tithi LIKE $query ESCAPE '\'
+              OR BsFullDate LIKE $query ESCAPE '\'
+              OR AdDateText LIKE $query ESCAPE '\'
+              OR AdDateIso = $adDateIso
+              OR NepaliWeekday LIKE $query ESCAPE '\'
+              OR BsMonthName LIKE $query ESCAPE '\'
+             ORDER BY AdDateIso DESC
+             LIMIT 100;
+             """;
+        command.Parameters.AddWithValue("$query", $"%{EscapeLikePattern(trimmedQuery)}%");
         command.Parameters.AddWithValue("$adDateIso", adDateIso);
 
         await using var reader = await command.ExecuteReaderAsync();
@@ -239,6 +239,15 @@ public sealed class CalendarRepository
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Escapes SQLite LIKE special characters so user input is matched literally.
+    /// Must be used together with ESCAPE '\' in the SQL.
+    /// </summary>
+    internal static string EscapeLikePattern(string value)
+    {
+        return value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
     }
 
     private static string? TryNormalizeAdDateIso(string query)

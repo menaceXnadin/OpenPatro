@@ -61,6 +61,12 @@ public sealed class WindowLayoutService
     /// </summary>
     public const double WeekdayHeaderBottomMarginDip = 10;
 
+    /// <summary>
+    /// Estimated weekday header height used when the header has not been measured yet
+    /// (ActualHeight == 0 pre-layout). Prevents over-tall cells that clip the last row.
+    /// </summary>
+    public const double FallbackWeekdayHeaderHeightDip = 40;
+
     // ── DPI helpers ──
 
     /// <summary>Standard DPI (100 % scaling).</summary>
