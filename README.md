@@ -14,12 +14,6 @@
 	</tr>
 </table>
 
-## Showcase
-
-Watch the project showcase video here:
-
-- https://www.youtube.com/watch?v=_vEKSE44C8U
-
 ## Download (Self-contained)
 
 Download the latest `OpenPatroSetup-<version>-x64.exe` from GitHub Releases:
