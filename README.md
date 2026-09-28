@@ -22,9 +22,9 @@ Watch the project showcase video here:
 
 ## Download (Self-contained)
 
-Download the self-contained version of OpenPatro from Google Drive:
+Download the latest `OpenPatroSetup-<version>-x64.exe` from GitHub Releases:
 
-- https://drive.google.com/drive/u/4/folders/1W2VYk_C__OXDMFhVb_Ld1-ntxvioIrB0
+- https://github.com/menaceXnadin/OpenPatro/releases
 
 ### "Windows protected your PC" message (safe to skip)
 
