@@ -10,7 +10,7 @@
   <Identity
     Name="e38b3105-4b4f-466f-af46-cfdf079a7e30"
     Publisher="CN=MenaceXnadin"
-    Version="1.0.0.0" />
+    Version="1.0.1.0" />
 
   <mp:PhoneIdentity PhoneProductId="e38b3105-4b4f-466f-af46-cfdf079a7e30" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 

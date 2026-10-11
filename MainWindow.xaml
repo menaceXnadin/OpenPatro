@@ -2527,8 +2527,8 @@
                                                    Stretch="Uniform"
                                                    ImageOpened="ForexFlagImage_ImageOpened"
                                                    ImageFailed="ForexFlagImage_ImageFailed"
-                                                   Tag="{x:Bind ViewModel.Forex.SelectedCurrency?.Code, Mode=OneWay}" />
-                                            <TextBlock Text="{x:Bind ViewModel.Forex.SelectedCurrency?.Code, Mode=OneWay}"
+                                                   Tag="{x:Bind ViewModel.Forex.SelectedCurrency.Code, Mode=OneWay}" />
+                                            <TextBlock Text="{x:Bind ViewModel.Forex.SelectedCurrency.Code, Mode=OneWay}"
                                                        Visibility="Collapsed"
                                                        HorizontalAlignment="Center"
                                                        VerticalAlignment="Center" />

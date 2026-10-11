@@ -19,7 +19,7 @@
 ; - Version below must be bumped together with Package.appxmanifest.
 
 #define MyAppName "OpenPatro"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "MenaceXnadin"
 #define MyAppExeName "OpenPatro.exe"
 #define PublishDir "..\\bin\\win-x64\\publish"
