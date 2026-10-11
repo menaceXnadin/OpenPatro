@@ -31,7 +31,7 @@ public sealed class CalendarDayCellViewModel : BindableBase
 
     public required bool IsToday { get; init; }
 
-    public required bool IsSaturdayColumn { get; init; }
+    public required bool IsWeekendColumn { get; init; }
 
     public string EventText => Record.EventSummary == "--" ? string.Empty : Record.EventSummary;
 
@@ -64,7 +64,7 @@ public sealed class CalendarDayCellViewModel : BindableBase
         ? new(Color.FromArgb(72, 200, 200, 200))
         : IsSelected
             ? new(Color.FromArgb(255, 255, 250, 244))
-            : Record.IsHoliday || IsSaturdayColumn
+            : Record.IsHoliday || IsWeekendColumn
                 ? new(HolidayColor)
                 : IsToday
                     ? new(Color.FromArgb(255, 236, 238, 242))
@@ -73,7 +73,7 @@ public sealed class CalendarDayCellViewModel : BindableBase
     // ── Event text foreground ───────────────────────────────────────────
     public SolidColorBrush SecondaryForegroundBrush => IsSelected
         ? new(Color.FromArgb(210, 255, 241, 228))
-        : Record.IsHoliday || IsSaturdayColumn
+        : Record.IsHoliday || IsWeekendColumn
             ? new(Color.FromArgb(180, HolidayColor.R, HolidayColor.G, HolidayColor.B))
             : IsToday
                 ? new(Color.FromArgb(158, 210, 214, 222))
@@ -84,7 +84,7 @@ public sealed class CalendarDayCellViewModel : BindableBase
         ? new(Color.FromArgb(58, 180, 180, 180))
         : IsSelected
             ? new(Color.FromArgb(170, 255, 236, 220))
-            : Record.IsHoliday || IsSaturdayColumn
+            : Record.IsHoliday || IsWeekendColumn
                 ? new(Color.FromArgb(140, HolidayColor.R, HolidayColor.G, HolidayColor.B))
                 : IsToday
                     ? new(Color.FromArgb(120, 180, 184, 196))

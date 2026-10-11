@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Prebuild calendar.db by scraping Hamro Patro calendar HTML month by month."""
+"""Prebuild calendar.db by scraping Hamro Patro calendar pages month by month."""
 
 from __future__ import annotations
 
 import argparse
-import html
+import json
 import os
 import re
 import sqlite3
@@ -12,32 +12,27 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
-BASE_URL = "https://www.hamropatro.com/gui/home/calender-ajax.php?year={year}&month={month}"
+BASE_URL = "https://www.hamropatro.com/calendar/{year}/{month}"
 REQUEST_GAP_SECONDS = 0.5
 RETRY_DELAY_SECONDS = 2.0
 HTTP_TIMEOUT_SECONDS = 30
 USER_AGENT = "OpenPatroCalendarBuilder/1.0 (+https://www.hamropatro.com)"
 
-TITLE_RE = re.compile(r"<span\s+class=\"newDateText\s+headderNew\">(.*?)</span>", re.DOTALL | re.IGNORECASE)
-DATES_BLOCK_RE = re.compile(r"<ul\s+class=\"dates\s+clearfix\">(.*?)</ul>", re.DOTALL | re.IGNORECASE)
-LI_BLOCK_RE = re.compile(r"<li\b[\s\S]*?</li>", re.DOTALL | re.IGNORECASE)
-CLASS_RE = re.compile(r"\bclass=\"(.*?)\"", re.DOTALL | re.IGNORECASE)
-EVENT_RE = re.compile(r"<span\s+class=\"event\">(.*?)</span>", re.DOTALL | re.IGNORECASE)
-NEP_DAY_RE = re.compile(r"<span\s+class=\"nep\">(.*?)</span>", re.DOTALL | re.IGNORECASE)
-TITHI_RE = re.compile(r"<span\s+class=\"tithi\">(.*?)</span>", re.DOTALL | re.IGNORECASE)
-COL1_SPAN_RE = re.compile(r"<div\s+class=\"col1\"[\s\S]*?<span[^>]*>(.*?)</span>", re.DOTALL | re.IGNORECASE)
-COL2_RE = re.compile(r"<div\s+class=\"col2\"[^>]*>(.*?)</div>", re.DOTALL | re.IGNORECASE)
-PANCHANGA_RE = re.compile(r"<div\s+class=\"panchangaWrapper\">(.*?)</div>", re.DOTALL | re.IGNORECASE)
-VIEW_DETAILS_HREF_RE = re.compile(r"<h3\s+class=\"viewDetails\"[\s\S]*?<a[^>]*href=\"([^\"]+)\"", re.DOTALL | re.IGNORECASE)
-EVENT_HREF_RE = re.compile(r"<div\s+class=\"eventPopupWrapper\"[\s\S]*?<a[^>]*href=\"([^\"]+)\"", re.DOTALL | re.IGNORECASE)
-DETAILS_PATH_RE = re.compile(r"/date/(\d+)-(\d+)-(\d+)")
-BR_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
-TAG_RE = re.compile(r"<[^>]+>")
+# The month page embeds its grid as JSON in <script id="hp-bootstrap"> under data.calendar.initialMonths.
+BOOTSTRAP_RE = re.compile(r"<script[^>]*\bid=\"hp-bootstrap\"[^>]*>(.*?)</script>", re.DOTALL)
 WHITESPACE_RE = re.compile(r"\s+")
+
+# Name tables mirror Hamro Patro's JS bundle; panchanga fields are indices into them.
+# Keep in sync with Services/HamroPatroParser.cs.
+LUNAR_MONTH_NAMES = ["वैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत"]
+PAKSHA_NAMES = ["शुक्ल", "कृष्ण"]
+YOGA_NAMES = ["विषकुम्भ", "प्रीति", "आयुष्मान", "सौभाग्य", "शोभन", "अतिगंड", "सुकर्मा", "धृति", "शूल", "गण्ड", "वृद्धि", "ध्रुव", "व्याघात", "हर्षण", "वज्र", "सिद्धि", "व्यतिपात", "वरियान", "परिधि", "शिव", "सिद्ध", "साध्य", "शुभ", "शुक्ल", "ब्रह्म", "एन्द्र", "वैधृति"]
+KARANA_NAMES = ["बव", "बालव", "कौलव", "तैतिल", "गर", "वणिज", "विष्टि/भद्रा", "शकुनि", "चतुष्पद", "नाग", "किंस्तुघ्न"]
+NAKSHATRA_NAMES = ["अश्विनी", "भरणी", "कृत्तिका", "रोहिणी", "मृगशिरा", "आर्द्रा", "पुनर्वसु", "पुष्य", "अश्लेषा", "मघा", "पूर्वफल्गुनी", "उत्तरफल्गुनी", "हस्ता", "चित्रा", "स्वाति", "विशाखा", "अनुराधा", "ज्येष्ठा", "मूल", "पूर्वाषाढा", "उत्तरषाढा", "श्रवण", "धनिष्ठा", "शतभिषा", "पूर्वभाद्र", "उत्तरभाद्र", "रेवती"]
 
 
 @dataclass
@@ -100,139 +95,82 @@ class CalendarScraper:
         return payload.decode(charset, errors="replace")
 
     def parse_month(self, requested_year: int, requested_month: int, html_text: str) -> MonthPayload:
-        title_matches = TITLE_RE.findall(html_text)
-        if len(title_matches) < 2:
-            raise ValueError("Could not find month title spans in response")
+        bootstrap_match = BOOTSTRAP_RE.search(html_text)
+        if not bootstrap_match:
+            raise ValueError("Could not find hp-bootstrap calendar data in response")
 
-        title_nepali = self._clean_text(title_matches[0]).rstrip("|").strip()
-        title_english = self._clean_text(title_matches[1])
+        months = json.loads(bootstrap_match.group(1))["data"]["calendar"]["initialMonths"]
+        month = next((m for m in months if m["yearBs"] == requested_year and m["monthBs"] == requested_month), None)
+        if month is None:
+            raise ValueError(f"BS {requested_year}-{requested_month:02d} missing from calendar data")
 
-        dates_block_match = DATES_BLOCK_RE.search(html_text)
-        if not dates_block_match:
-            raise ValueError("Could not find calendar day block in response")
+        in_month = sorted((d for d in month["days"] if d["inMonth"]), key=lambda d: d["day_bs"])
+        if not in_month or len(in_month) != month["daysInMonth"]:
+            raise ValueError(f"Expected {month['daysInMonth']} days for BS {requested_year}-{requested_month:02d}, found {len(in_month)}")
 
-        li_blocks = LI_BLOCK_RE.findall(dates_block_match.group(1))
-        if not li_blocks:
-            raise ValueError("No day cards found in calendar day block")
+        weekdays = [header["np"] for header in month["weekdayHeaders"]]
+        days = [self._parse_day(month, day, weekdays) for day in in_month]
 
-        days: list[DayRow] = []
-        seen: set[tuple[int, int, int]] = set()
+        first_ad = self._ad_date(in_month[0])
+        last_ad = self._ad_date(in_month[-1])
+        english_months = f"{first_ad:%b}/{last_ad:%b}"
+        title_english = f"{english_months} {first_ad.year}" if first_ad.year == last_ad.year else f"{english_months} {first_ad.year}-{last_ad.year}"
 
-        for block in li_blocks:
-            day = self._parse_day_block(block)
-            if day is None:
-                continue
-            if day.bs_year != requested_year or day.bs_month != requested_month:
-                continue
+        return MonthPayload(title_nepali=f"{month['yearBsNp']} {month['monthNameNp']}", title_english=title_english, days=days)
 
-            key = (day.bs_year, day.bs_month, day.bs_day)
-            if key in seen:
-                continue
-            seen.add(key)
-            days.append(day)
+    def _parse_day(self, month: dict, day: dict, weekdays: list[str]) -> DayRow:
+        ad_date = self._ad_date(day)
+        if ad_date.isoweekday() % 7 != day["dayOfWeek"]:
+            raise ValueError(f"Weekday mismatch for BS {day['year_bs']}-{day['month_bs']}-{day['day_bs']}")
 
-        days.sort(key=lambda d: d.bs_day)
+        nepali_weekday = weekdays[day["dayOfWeek"]]
+        patro_event = day.get("patroEvent") or {}
+        events = [self._clean_text(item.get("titleNp")) for item in patro_event.get("items") or []]
+        tithi = self._clean_text(day.get("tithiShort"))
+        panchanga = day.get("panchanga")
 
-        if not days:
-            raise ValueError(f"No in-month days parsed for BS {requested_year}-{requested_month:02d}")
-
-        return MonthPayload(title_nepali=title_nepali, title_english=title_english, days=days)
-
-    def _parse_day_block(self, block: str) -> DayRow | None:
-        class_value = self._first_group(CLASS_RE, block)
-        class_tokens = self._clean_text(class_value).split()
-        is_holiday = 1 if any(token.lower() == "holiday" for token in class_tokens) else 0
-
-        event_text = self._clean_text(self._first_group(EVENT_RE, block))
-        if event_text == "--":
-            event_text = ""
-
-        bs_day_text = self._clean_text(self._first_group(NEP_DAY_RE, block))
-        if not bs_day_text:
-            return None
-
-        tithi = ""
-        for value in TITHI_RE.findall(block):
-            candidate = self._clean_text(value)
-            if candidate:
-                tithi = candidate
-                break
-
-        bs_full_date = self._clean_text(self._first_group(COL1_SPAN_RE, block))
-        ad_date_text = self._clean_text(self._first_group(COL2_RE, block))
-        if not bs_full_date or not ad_date_text:
-            return None
-
-        panchanga_inner = self._first_group(PANCHANGA_RE, block)
-        panchanga_lines = self._extract_text_lines(panchanga_inner)
-        lunar_text = panchanga_lines[0] if len(panchanga_lines) > 0 else ""
-        panchanga_text = panchanga_lines[1] if len(panchanga_lines) > 1 else ""
-
-        details_path = self._first_group(VIEW_DETAILS_HREF_RE, block) or self._first_group(EVENT_HREF_RE, block)
-        details_match = DETAILS_PATH_RE.search(details_path)
-        if not details_match:
-            return None
-
-        bs_year = int(details_match.group(1))
-        bs_month = int(details_match.group(2))
-        bs_day = int(details_match.group(3))
-
-        left, sep, right = bs_full_date.partition(",")
-        nepali_weekday = right.strip() if sep else ""
-        bs_month_name = self._extract_bs_month_name(left)
-
-        ad_date_iso = datetime.strptime(ad_date_text, "%B %d, %Y").strftime("%Y-%m-%d")
+        if panchanga:
+            adhik = "अधिक " if panchanga.get("monthType") == 1 else ""
+            lunar_text = f"{adhik}{self._lookup(LUNAR_MONTH_NAMES, panchanga.get('month'))} {self._lookup(PAKSHA_NAMES, panchanga.get('paksha'))} {tithi}".strip()
+            panchanga_text = (
+                f"पञ्चाङ्ग: {self._lookup(YOGA_NAMES, panchanga.get('yoga'))} "
+                f"{self._lookup(KARANA_NAMES, panchanga.get('karana'))} "
+                f"{self._lookup(NAKSHATRA_NAMES, panchanga.get('nakshtra'))}"
+            )
+        else:
+            lunar_text = "--"
+            panchanga_text = ""
 
         return DayRow(
-            bs_year=bs_year,
-            bs_month=bs_month,
-            bs_day=bs_day,
-            bs_day_text=bs_day_text,
-            bs_month_name=bs_month_name,
-            bs_full_date=bs_full_date,
+            bs_year=day["year_bs"],
+            bs_month=day["month_bs"],
+            bs_day=day["day_bs"],
+            bs_day_text=day["dayBsNp"],
+            bs_month_name=month["monthNameNp"],
+            bs_full_date=f"{day['dayBsNp']} {month['monthNameNp']} {month['yearBsNp']}, {nepali_weekday}",
             nepali_weekday=nepali_weekday,
-            ad_date_iso=ad_date_iso,
-            ad_date_text=ad_date_text,
-            event_summary=event_text,
+            ad_date_iso=ad_date.strftime("%Y-%m-%d"),
+            ad_date_text=ad_date.strftime("%B %d, %Y"),
+            event_summary="/".join(event for event in events if event),
             tithi=tithi,
             lunar_text=lunar_text,
             panchanga=panchanga_text,
-            details_path=details_path,
-            is_holiday=is_holiday,
+            details_path=f"/date/{day['year_bs']}-{day['month_bs']}-{day['day_bs']}",
+            # Event-level flag only: the day-level isHoliday also covers weekends, which the app colours itself.
+            is_holiday=1 if patro_event.get("isHoliday") else 0,
         )
 
     @staticmethod
-    def _first_group(pattern: re.Pattern[str], text: str) -> str:
-        match = pattern.search(text)
-        return match.group(1) if match else ""
+    def _ad_date(day: dict) -> date:
+        return date(day["year_ad"], day["month_ad"], day["day_ad"])
 
     @staticmethod
-    def _extract_text_lines(fragment: str) -> list[str]:
-        if not fragment:
-            return []
-        normalized = BR_RE.sub("\n", fragment)
-        stripped = TAG_RE.sub(" ", normalized)
-        decoded = html.unescape(stripped).replace("\r", "")
-        lines = []
-        for raw in decoded.split("\n"):
-            clean = WHITESPACE_RE.sub(" ", raw).strip()
-            if clean:
-                lines.append(clean)
-        return lines
+    def _lookup(names: list[str], index: int | None) -> str:
+        return names[index] if isinstance(index, int) and 0 <= index < len(names) else ""
 
     @staticmethod
-    def _clean_text(value: str) -> str:
-        if not value:
-            return ""
-        no_tags = TAG_RE.sub(" ", value)
-        decoded = html.unescape(no_tags)
-        normalized = decoded.replace("\r", " ").replace("\n", " ").replace("\t", " ")
-        return WHITESPACE_RE.sub(" ", normalized).strip()
-
-    @staticmethod
-    def _extract_bs_month_name(bs_date_text: str) -> str:
-        parts = bs_date_text.split()
-        return parts[1] if len(parts) >= 3 else ""
+    def _clean_text(value: str | None) -> str:
+        return WHITESPACE_RE.sub(" ", value).strip() if value else ""
 
 
 def utc_now_iso() -> str:

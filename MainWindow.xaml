@@ -276,8 +276,9 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="आइत" FontFamily="{StaticResource AppNepaliFontFamily}"
-                                           FontSize="12" FontWeight="Medium" Opacity="0.62"
-                                           HorizontalAlignment="Center" />
+                                           FontSize="12" FontWeight="Medium" Opacity="0.42"
+                                           HorizontalAlignment="Center"
+                                           Foreground="#EF6C6C" />
                                 <TextBlock Grid.Column="1" Text="सोम" FontFamily="{StaticResource AppNepaliFontFamily}"
                                            FontSize="12" FontWeight="Medium" Opacity="0.62"
                                            HorizontalAlignment="Center" />

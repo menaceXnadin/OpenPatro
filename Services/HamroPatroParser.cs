@@ -2,139 +2,210 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using HtmlAgilityPack;
 using OpenPatro.Models;
 
 namespace OpenPatro.Services;
 
+/// <summary>
+/// Parses hamropatro.com/calendar/{year}/{month}. The page embeds its month grid as JSON in
+/// &lt;script id="hp-bootstrap"&gt; under data.calendar.initialMonths (previous, requested and next month).
+/// </summary>
 public sealed partial class HamroPatroParser
 {
+    // Name tables mirror the ones in Hamro Patro's own JS bundle; panchanga fields are indices into them.
+    private static readonly string[] LunarMonthNames = { "वैशाख", "जेठ", "असार", "साउन", "भदौ", "असोज", "कार्तिक", "मंसिर", "पुष", "माघ", "फागुन", "चैत" };
+    private static readonly string[] PakshaNames = { "शुक्ल", "कृष्ण" };
+    private static readonly string[] YogaNames = { "विषकुम्भ", "प्रीति", "आयुष्मान", "सौभाग्य", "शोभन", "अतिगंड", "सुकर्मा", "धृति", "शूल", "गण्ड", "वृद्धि", "ध्रुव", "व्याघात", "हर्षण", "वज्र", "सिद्धि", "व्यतिपात", "वरियान", "परिधि", "शिव", "सिद्ध", "साध्य", "शुभ", "शुक्ल", "ब्रह्म", "एन्द्र", "वैधृति" };
+    private static readonly string[] KaranaNames = { "बव", "बालव", "कौलव", "तैतिल", "गर", "वणिज", "विष्टि/भद्रा", "शकुनि", "चतुष्पद", "नाग", "किंस्तुघ्न" };
+    private static readonly string[] NakshatraNames = { "अश्विनी", "भरणी", "कृत्तिका", "रोहिणी", "मृगशिरा", "आर्द्रा", "पुनर्वसु", "पुष्य", "अश्लेषा", "मघा", "पूर्वफल्गुनी", "उत्तरफल्गुनी", "हस्ता", "चित्रा", "स्वाति", "विशाखा", "अनुराधा", "ज्येष्ठा", "मूल", "पूर्वाषाढा", "उत्तरषाढा", "श्रवण", "धनिष्ठा", "शतभिषा", "पूर्वभाद्र", "उत्तरभाद्र", "रेवती" };
+
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
     public ParsedCalendarMonth ParseMonthHtml(int requestedYear, int requestedMonth, string html)
     {
-        var document = new HtmlDocument();
-        document.LoadHtml(html);
+        var month = ExtractInitialMonths(html).FirstOrDefault(m => m.YearBs == requestedYear && m.MonthBs == requestedMonth)
+            ?? throw new InvalidOperationException($"Month {requestedYear}/{requestedMonth} not found in calendar data.");
 
-        var titleNodes = document.DocumentNode.SelectNodes("//span[contains(@class,'headderNew')]") ?? throw new InvalidOperationException("Month header not found.");
-        var dateNodes = document.DocumentNode.SelectNodes("//ul[contains(@class,'dates')]/li[contains(@onclick,'openPopUp')]") ?? throw new InvalidOperationException("Calendar day nodes not found.");
-
-        var days = new List<CalendarDayRecord>(dateNodes.Count);
-        foreach (var dateNode in dateNodes)
+        var inMonthDays = month.Days.Where(static day => day.InMonth).OrderBy(static day => day.DayBs).ToList();
+        if (inMonthDays.Count == 0 || inMonthDays.Count != month.DaysInMonth)
         {
-            days.Add(ParseDayNode(dateNode));
+            throw new InvalidOperationException($"Expected {month.DaysInMonth} days for {requestedYear}/{requestedMonth}, found {inMonthDays.Count}.");
         }
+
+        var days = inMonthDays.Select(day => ParseDay(month, day)).ToList();
+        var firstAd = inMonthDays[0].AdDate;
+        var lastAd = inMonthDays[^1].AdDate;
+        var englishMonths = $"{firstAd.ToString("MMM", CultureInfo.InvariantCulture)}/{lastAd.ToString("MMM", CultureInfo.InvariantCulture)}";
 
         return new ParsedCalendarMonth
         {
             RequestedYear = requestedYear,
             RequestedMonth = requestedMonth,
-            TitleNepali = CleanText(titleNodes[0].InnerText).TrimEnd('|', ' '),
-            TitleEnglish = CleanText(titleNodes[1].InnerText),
+            TitleNepali = $"{month.YearBsNp} {month.MonthNameNp}",
+            TitleEnglish = firstAd.Year == lastAd.Year ? $"{englishMonths} {firstAd.Year}" : $"{englishMonths} {firstAd.Year}-{lastAd.Year}",
             Days = days
         };
     }
 
-    private static CalendarDayRecord ParseDayNode(HtmlNode dayNode)
+    private static List<HpMonth> ExtractInitialMonths(string html)
     {
-        var classValue = dayNode.GetAttributeValue("class", string.Empty);
-        var isHoliday = classValue.Contains("holiday", StringComparison.OrdinalIgnoreCase);
-
-        var eventText = CleanText(dayNode.SelectSingleNode("./span[contains(@class,'event')]")?.InnerText ?? "--");
-        var bsDayText = CleanText(dayNode.SelectSingleNode("./span[contains(@class,'nep')]")?.InnerText ?? throw new InvalidOperationException("BS day text missing."));
-        var tithiText = dayNode.SelectNodes("./span[contains(@class,'tithi')]")?.Select(node => CleanText(node.InnerText)).FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)) ?? string.Empty;
-
-        var popupNode = dayNode.SelectSingleNode(".//div[contains(@class,'daydetailsPopOver')]") ?? throw new InvalidOperationException("Popup node missing.");
-        var fullBsText = CleanText(popupNode.SelectSingleNode(".//div[contains(@class,'col1')]//span")?.InnerText ?? throw new InvalidOperationException("Full BS date missing."));
-        var adDateText = CleanText(popupNode.SelectSingleNode(".//div[contains(@class,'col2')]")?.InnerText ?? throw new InvalidOperationException("AD date missing."));
-        var panchangaBlock = popupNode.SelectSingleNode(".//div[contains(@class,'panchangaWrapper')]") ?? throw new InvalidOperationException("Panchanga block missing.");
-
-        var panchangaLines = panchangaBlock.InnerText
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(CleanText)
-            .Where(static text => !string.IsNullOrWhiteSpace(text))
-            .ToArray();
-
-        var lunarText = panchangaLines.ElementAtOrDefault(0) ?? string.Empty;
-        var panchanga = panchangaLines.ElementAtOrDefault(1) ?? string.Empty;
-        var detailsPath = popupNode.SelectSingleNode(".//h3[contains(@class,'viewDetails')]//a")?.GetAttributeValue("href", string.Empty)
-            ?? popupNode.SelectSingleNode(".//div[contains(@class,'eventPopupWrapper')]//a")?.GetAttributeValue("href", string.Empty)
-            ?? string.Empty;
-
-        var detailsMatch = DetailsPathRegex().Match(detailsPath);
-        if (!detailsMatch.Success)
+        var match = BootstrapScriptRegex().Match(html);
+        if (!match.Success)
         {
-            throw new InvalidOperationException($"Unexpected details path: {detailsPath}");
+            throw new InvalidOperationException("Calendar bootstrap data not found.");
         }
 
-        var bsYear = int.Parse(detailsMatch.Groups[1].Value, CultureInfo.InvariantCulture);
-        var bsMonth = int.Parse(detailsMatch.Groups[2].Value, CultureInfo.InvariantCulture);
-        var bsDay = int.Parse(detailsMatch.Groups[3].Value, CultureInfo.InvariantCulture);
+        using var document = JsonDocument.Parse(match.Groups[1].Value);
+        if (!document.RootElement.TryGetProperty("data", out var data)
+            || !data.TryGetProperty("calendar", out var calendar)
+            || !calendar.TryGetProperty("initialMonths", out var initialMonths))
+        {
+            throw new InvalidOperationException("Calendar months missing from bootstrap data.");
+        }
 
-        var bsTextParts = fullBsText.Split(',', 2, StringSplitOptions.TrimEntries);
-        var nepaliWeekday = bsTextParts.Length > 1 ? bsTextParts[1] : string.Empty;
-        var bsMonthName = ExtractBsMonthName(bsTextParts[0]);
-        var adDate = DateTime.ParseExact(adDateText, "MMMM dd, yyyy", CultureInfo.InvariantCulture);
+        return initialMonths.Deserialize<List<HpMonth>>(JsonOptions) ?? throw new InvalidOperationException("Calendar months could not be read.");
+    }
 
-        // Sanity-check: the NepaliWeekday scraped from the page must agree with what
-        // .NET derives from the parsed AD date.  If they disagree the page layout was
-        // inconsistent (e.g. the popup node belonged to a different day cell) and we
-        // should not trust the parsed AD date at all.
-        var expectedDow = adDate.DayOfWeek;
-        var weekdayConsistent = IsWeekdayConsistent(nepaliWeekday, expectedDow);
-        if (!weekdayConsistent)
+    private static CalendarDayRecord ParseDay(HpMonth month, HpDay day)
+    {
+        var adDate = day.AdDate;
+        if ((int)adDate.DayOfWeek != day.DayOfWeek || day.DayOfWeek >= month.WeekdayHeaders.Count)
         {
             throw new InvalidOperationException(
-                $"Weekday mismatch for BS {bsYear}/{bsMonth}/{bsDay}: " +
-                $"page says '{nepaliWeekday}' but AD date {adDate:yyyy-MM-dd} is a {expectedDow}.");
+                $"Weekday mismatch for BS {day.YearBs}/{day.MonthBs}/{day.DayBs}: " +
+                $"page says {day.DayOfWeek} but AD date {adDate:yyyy-MM-dd} is a {adDate.DayOfWeek}.");
         }
+
+        var nepaliWeekday = month.WeekdayHeaders[day.DayOfWeek].Np;
+        var events = day.PatroEvent?.Items.Select(static item => CleanText(item.TitleNp)).Where(static title => title.Length > 0).ToList() ?? new List<string>();
+        var tithi = CleanText(day.TithiShort);
+        var panchanga = day.Panchanga;
 
         return new CalendarDayRecord
         {
-            BsYear = bsYear,
-            BsMonth = bsMonth,
-            BsDay = bsDay,
-            BsDayText = bsDayText,
-            BsMonthName = bsMonthName,
-            BsFullDate = fullBsText,
+            BsYear = day.YearBs,
+            BsMonth = day.MonthBs,
+            BsDay = day.DayBs,
+            BsDayText = day.DayBsNp,
+            BsMonthName = month.MonthNameNp,
+            BsFullDate = $"{day.DayBsNp} {month.MonthNameNp} {month.YearBsNp}, {nepaliWeekday}",
             NepaliWeekday = nepaliWeekday,
-            AdDateIso = DateOnly.FromDateTime(adDate).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-            AdDateText = adDateText,
-            EventSummary = eventText,
-            Tithi = tithiText,
-            LunarText = lunarText,
-            Panchanga = panchanga,
-            DetailsPath = detailsPath,
-            IsHoliday = isHoliday
+            AdDateIso = adDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            AdDateText = adDate.ToString("MMMM dd, yyyy", CultureInfo.InvariantCulture),
+            EventSummary = events.Count > 0 ? string.Join('/', events) : "--",
+            Tithi = tithi,
+            LunarText = panchanga is null
+                ? "--"
+                : $"{(panchanga.MonthType == 1 ? "अधिक " : string.Empty)}{Lookup(LunarMonthNames, panchanga.Month)} {Lookup(PakshaNames, panchanga.Paksha)} {tithi}".Trim(),
+            Panchanga = panchanga is null
+                ? string.Empty
+                : $"पञ्चाङ्ग: {Lookup(YogaNames, panchanga.Yoga)} {Lookup(KaranaNames, panchanga.Karana)} {Lookup(NakshatraNames, panchanga.Nakshtra)}",
+            DetailsPath = $"/date/{day.YearBs}-{day.MonthBs}-{day.DayBs}",
+            // Event-level flag only: the day-level isHoliday also covers weekends, which the UI colours itself.
+            IsHoliday = day.PatroEvent?.IsHoliday == true
         };
     }
 
-    private static bool IsWeekdayConsistent(string nepaliWeekday, DayOfWeek adDayOfWeek)
+    private static string Lookup(string[] names, int index)
     {
-        // Map .NET DayOfWeek to the Nepali weekday substrings used by HamroPatro.
-        return adDayOfWeek switch
-        {
-            DayOfWeek.Sunday    => nepaliWeekday.Contains("आइत",  StringComparison.Ordinal),
-            DayOfWeek.Monday    => nepaliWeekday.Contains("सोम",  StringComparison.Ordinal),
-            DayOfWeek.Tuesday   => nepaliWeekday.Contains("मंगल", StringComparison.Ordinal) || nepaliWeekday.Contains("मङ्गल", StringComparison.Ordinal),
-            DayOfWeek.Wednesday => nepaliWeekday.Contains("बुध",  StringComparison.Ordinal),
-            DayOfWeek.Thursday  => nepaliWeekday.Contains("बिहि", StringComparison.Ordinal) || nepaliWeekday.Contains("बृह", StringComparison.Ordinal),
-            DayOfWeek.Friday    => nepaliWeekday.Contains("शुक्र", StringComparison.Ordinal),
-            DayOfWeek.Saturday  => nepaliWeekday.Contains("शनि",  StringComparison.Ordinal),
-            _                   => false
-        };
+        return (uint)index < (uint)names.Length ? names[index] : string.Empty;
     }
 
-    private static string ExtractBsMonthName(string bsDateText)
+    private static string CleanText(string? value)
     {
-        var parts = bsDateText.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return parts.Length >= 3 ? parts[1] : string.Empty;
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : WhitespaceRegex().Replace(value, " ").Trim();
     }
 
-    private static string CleanText(string value)
+    [GeneratedRegex(@"<script[^>]*\bid=""hp-bootstrap""[^>]*>(.*?)</script>", RegexOptions.Singleline)]
+    private static partial Regex BootstrapScriptRegex();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex WhitespaceRegex();
+
+    private sealed class HpMonth
     {
-        return HtmlEntity.DeEntitize(value).Replace("\r", string.Empty).Replace("\t", " ").Trim();
+        public int YearBs { get; set; }
+
+        public int MonthBs { get; set; }
+
+        public string MonthNameNp { get; set; } = string.Empty;
+
+        public string YearBsNp { get; set; } = string.Empty;
+
+        public int DaysInMonth { get; set; }
+
+        public List<HpWeekdayHeader> WeekdayHeaders { get; set; } = new();
+
+        public List<HpDay> Days { get; set; } = new();
     }
 
-    [GeneratedRegex(@"/date/(\d+)-(\d+)-(\d+)", RegexOptions.Compiled)]
-    private static partial Regex DetailsPathRegex();
+    private sealed class HpWeekdayHeader
+    {
+        public string Np { get; set; } = string.Empty;
+    }
+
+    private sealed class HpDay
+    {
+        [JsonPropertyName("year_ad")]
+        public int YearAd { get; set; }
+
+        [JsonPropertyName("month_ad")]
+        public int MonthAd { get; set; }
+
+        [JsonPropertyName("day_ad")]
+        public int DayAd { get; set; }
+
+        [JsonPropertyName("year_bs")]
+        public int YearBs { get; set; }
+
+        [JsonPropertyName("month_bs")]
+        public int MonthBs { get; set; }
+
+        [JsonPropertyName("day_bs")]
+        public int DayBs { get; set; }
+
+        public int DayOfWeek { get; set; }
+
+        public bool InMonth { get; set; }
+
+        public string DayBsNp { get; set; } = string.Empty;
+
+        public string? TithiShort { get; set; }
+
+        public HpPanchanga? Panchanga { get; set; }
+
+        public HpPatroEvent? PatroEvent { get; set; }
+
+        public DateOnly AdDate => new(YearAd, MonthAd, DayAd);
+    }
+
+    private sealed class HpPanchanga
+    {
+        public int Nakshtra { get; set; }
+
+        public int Month { get; set; }
+
+        public int MonthType { get; set; }
+
+        public int Paksha { get; set; }
+
+        public int Yoga { get; set; }
+
+        public int Karana { get; set; }
+    }
+
+    private sealed class HpPatroEvent
+    {
+        public bool IsHoliday { get; set; }
+
+        public List<HpEventItem> Items { get; set; } = new();
+    }
+
+    private sealed class HpEventItem
+    {
+        public string? TitleNp { get; set; }
+    }
 }

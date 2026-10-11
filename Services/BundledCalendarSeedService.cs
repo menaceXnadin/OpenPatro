@@ -43,7 +43,7 @@ public sealed class BundledCalendarSeedService
         {
             for (var month = 1; month <= 12; month++)
             {
-                var html = await httpClient.GetStringAsync($"https://www.hamropatro.com/gui/home/calender-ajax.php?year={year}&month={month}");
+                var html = await httpClient.GetStringAsync(HamroPatroClient.GetMonthUri(year, month));
                 var parsed = _parser.ParseMonthHtml(year, month, html);
                 await repository.UpsertMonthAsync(parsed);
             }

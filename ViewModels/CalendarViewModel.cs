@@ -383,7 +383,7 @@ public sealed class CalendarViewModel : BindableBase
             Record = record,
             IsCurrentMonth = isCurrentMonth,
             IsToday = isToday,
-            IsSaturdayColumn = weekdayColumnIndex == 6
+            IsWeekendColumn = weekdayColumnIndex is 0 or 6 // Saturday and Sunday are both public holidays in Nepal
         };
     }
 

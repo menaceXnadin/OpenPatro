@@ -81,7 +81,7 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="आ" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
+                <TextBlock Grid.Column="0" Text="आ" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupHolidayBrush}" />
                 <TextBlock Grid.Column="1" Text="सो" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
                 <TextBlock Grid.Column="2" Text="मं" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
                 <TextBlock Grid.Column="3" Text="बु" TextAlignment="Center" FontFamily="{StaticResource AppNepaliFontFamily}" FontSize="12" Foreground="{StaticResource TrayPopupMutedBrush}" />
