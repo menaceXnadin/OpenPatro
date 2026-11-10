@@ -11,10 +11,16 @@ public sealed class ShareHubNepseClient
 {
     private static readonly Uri HomePageDataUri = new("https://sharehubnepal.com/live/api/v2/nepselive/home-page-data", UriKind.Absolute);
 
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private readonly HttpClient _httpClient;
 
     public ShareHubNepseClient()
+        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(20) })
     {
+    }
+
+    internal ShareHubNepseClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenPatro/1.0");
     }
 
@@ -24,6 +30,6 @@ public sealed class ShareHubNepseClient
         response.EnsureSuccessStatusCode();
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        return await JsonSerializer.DeserializeAsync<StockMarketHomeData>(stream, cancellationToken: cancellationToken);
+        return await JsonSerializer.DeserializeAsync(stream, AppJsonContext.Default.StockMarketHomeData, cancellationToken);
     }
 }

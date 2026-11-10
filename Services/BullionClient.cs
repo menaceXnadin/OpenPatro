@@ -17,10 +17,16 @@ public sealed class BullionClient
 {
     private static readonly Uri BullionsBaseUri = new("https://api.nepalipatro.com.np/v3/bullions", UriKind.Absolute);
 
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private readonly HttpClient _httpClient;
 
     public BullionClient()
+        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(20) })
     {
+    }
+
+    internal BullionClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenPatro/1.0");
     }
 
@@ -42,7 +48,7 @@ public sealed class BullionClient
         var json = await _httpClient.GetStringAsync(url, cancellationToken);
 
         // The API returns: { "source": "Fenegosida", "data": { "2026-04-15": { ... }, ... } }
-        var apiResponse = JsonSerializer.Deserialize<BullionApiResponse>(json);
+        var apiResponse = JsonSerializer.Deserialize(json, AppJsonContext.Default.BullionApiResponse);
         var entries = apiResponse?.Data ?? new Dictionary<string, BullionDayEntry>();
 
         return new BullionResponse { Entries = entries };
@@ -54,7 +60,7 @@ public sealed class BullionClient
     /// </summary>
     private static DateOnly GetDefaultFromDate()
     {
-        return DateOnly.FromDateTime(DateTime.Today.AddDays(-30));
+        return new NepalTimeService().GetNepalToday().AddDays(-30);
     }
 
     private static string BuildFromDateUrl(DateOnly date)

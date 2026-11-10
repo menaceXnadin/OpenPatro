@@ -48,7 +48,6 @@ public sealed class TrayPopupWindow : Window
     private const int OutsideDismissSuppressionMs = 350;
 
     private DateTime _lastOutsideDismissUtc = DateTime.MinValue;
-    private const uint SpiGetWorkArea = 0x0030;
     private const int PopupMarginDip = 12;
     // Fallback size when content hasn't been measured yet (first layout pass).
     private const int FallbackWidthDip = 436;
@@ -62,14 +61,9 @@ public sealed class TrayPopupWindow : Window
     private DateTimeOffset _lastShownAt;
     private bool _hasFocusSinceShown;
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct Rect
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
+    // Screen point (physical px) the popup is anchored to: where the tray icon was
+    // clicked. Captured on show so later re-layouts don't follow the moving cursor.
+    private PointInt32? _anchor;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
     private static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int nIndex);
@@ -82,9 +76,6 @@ public sealed class TrayPopupWindow : Window
 
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hWnd);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern bool SystemParametersInfo(uint uiAction, uint uiParam, out Rect pvParam, uint fWinIni);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -170,6 +161,7 @@ public sealed class TrayPopupWindow : Window
     public void ShowPopup()
     {
         Bootstrap();
+        _anchor = GetCursorPos(out POINT cursor) ? new PointInt32(cursor.X, cursor.Y) : null;
         PositionWindow();
         _lastShownAt = DateTimeOffset.UtcNow;
         _hasFocusSinceShown = false;
@@ -293,7 +285,7 @@ public sealed class TrayPopupWindow : Window
             return;
         }
 
-        App.Log($"TrayPopup: activation -> {args.WindowActivationState}, hadFocus={_hasFocusSinceShown}");
+        App.Trace($"TrayPopup: activation -> {args.WindowActivationState}, hadFocus={_hasFocusSinceShown}");
         if (args.WindowActivationState != WindowActivationState.Deactivated)
         {
             _hasFocusSinceShown = true;
@@ -306,11 +298,11 @@ public sealed class TrayPopupWindow : Window
         // (real click-away) or the show is old enough to be a zombie.
         if (!_hasFocusSinceShown && DateTimeOffset.UtcNow - _lastShownAt < TimeSpan.FromSeconds(3))
         {
-            App.Log("TrayPopup: transient deactivate ignored (never had focus)");
+            App.Trace("TrayPopup: transient deactivate ignored (never had focus)");
             return;
         }
 
-        App.Log("TrayPopup: deactivated, hiding");
+        App.Trace("TrayPopup: deactivated, hiding");
         HidePopup();
     }
 
@@ -345,6 +337,8 @@ public sealed class TrayPopupWindow : Window
         _ = SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SwpNoMove | SwpNoSize | SwpNoZOrder | SwpNoActivate | SwpFrameChanged);
     }
 
+    private enum TaskbarEdge { Bottom, Top, Left, Right }
+
     private void PositionWindow()
     {
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
@@ -362,19 +356,46 @@ public sealed class TrayPopupWindow : Window
         var (widthPx, heightPx) = GetFittedSizePx(dpi);
         var marginPx = ScaleDip(PopupMarginDip, dpi);
 
-        var workArea = GetWorkArea();
-        var maxWidthPx = workArea.Right - workArea.Left - (marginPx * 2);
-        var maxHeightPx = workArea.Bottom - workArea.Top - (marginPx * 2);
-        widthPx = Math.Min(widthPx, Math.Max(maxWidthPx, marginPx * 2));
-        heightPx = Math.Min(heightPx, Math.Max(maxHeightPx, marginPx * 2));
+        // Use the monitor the tray icon was clicked on (not always the primary one),
+        // and open from whichever edge its taskbar is docked to.
+        var display = _anchor is { } anchorPoint
+            ? DisplayArea.GetFromPoint(anchorPoint, DisplayAreaFallback.Primary)
+            : DisplayArea.Primary;
+        var work = display.WorkArea;
+        var edge = GetTaskbarEdge(work, display.OuterBounds);
+        var anchor = _anchor ?? new PointInt32(work.X + work.Width, work.Y + work.Height);
 
-        var x = workArea.Right - widthPx - marginPx;
-        var y = workArea.Bottom - heightPx - marginPx;
+        widthPx = Math.Min(widthPx, Math.Max(work.Width - (marginPx * 2), marginPx * 2));
+        heightPx = Math.Min(heightPx, Math.Max(work.Height - (marginPx * 2), marginPx * 2));
+
+        var minX = work.X + marginPx;
+        var maxX = work.X + work.Width - widthPx - marginPx;
+        var minY = work.Y + marginPx;
+        var maxY = work.Y + work.Height - heightPx - marginPx;
+
+        var (x, y) = edge switch
+        {
+            TaskbarEdge.Top => (ClampTo(anchor.X - (widthPx / 2), minX, maxX), minY),
+            TaskbarEdge.Left => (minX, ClampTo(anchor.Y - (heightPx / 2), minY, maxY)),
+            TaskbarEdge.Right => (maxX, ClampTo(anchor.Y - (heightPx / 2), minY, maxY)),
+            _ => (ClampTo(anchor.X - (widthPx / 2), minX, maxX), maxY)
+        };
 
         AppWindow.MoveAndResize(new RectInt32(x, y, widthPx, heightPx));
-        LogShowState($"positioned workArea=({workArea.Left},{workArea.Top},{workArea.Right},{workArea.Bottom})");
+        LogShowState($"positioned edge={edge} work=({work.X},{work.Y},{work.Width}x{work.Height})");
     }
 
+    private static TaskbarEdge GetTaskbarEdge(RectInt32 work, RectInt32 outer)
+    {
+        if (work.Y > outer.Y) return TaskbarEdge.Top;
+        if (work.X > outer.X) return TaskbarEdge.Left;
+        if (work.X + work.Width < outer.X + outer.Width) return TaskbarEdge.Right;
+        return TaskbarEdge.Bottom; // also the auto-hide case (work area == bounds)
+    }
+
+    private static int ClampTo(int value, int min, int max) => max < min ? min : Math.Clamp(value, min, max);
+
+    [System.Diagnostics.Conditional("DEBUG")]
     private void LogShowState(string stage)
     {
         try
@@ -382,11 +403,11 @@ public sealed class TrayPopupWindow : Window
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             var pos = AppWindow.Position;
             var size = AppWindow.Size;
-            App.Log($"TrayPopup: {stage} hwnd=0x{hwnd.ToInt64():X}, osVisible={IsWindowVisible(hwnd)}, isForeground={GetForegroundWindow() == hwnd}, pos=({pos.X},{pos.Y}), size=({size.Width}x{size.Height})");
+            App.Trace($"TrayPopup: {stage} hwnd=0x{hwnd.ToInt64():X}, osVisible={IsWindowVisible(hwnd)}, isForeground={GetForegroundWindow() == hwnd}, pos=({pos.X},{pos.Y}), size=({size.Width}x{size.Height})");
         }
         catch (Exception ex)
         {
-            App.Log($"TrayPopup: LogShowState FAILED: {ex.Message}");
+            App.Trace($"TrayPopup: LogShowState FAILED: {ex.Message}");
         }
     }
 
@@ -412,15 +433,5 @@ public sealed class TrayPopupWindow : Window
     private static int ScaleDip(double dip, uint dpi)
     {
         return (int)Math.Ceiling(dip * dpi / 96.0);
-    }
-
-    private static Rect GetWorkArea()
-    {
-        if (SystemParametersInfo(SpiGetWorkArea, 0, out var workArea, 0))
-        {
-            return workArea;
-        }
-
-        return new Rect { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
     }
 }

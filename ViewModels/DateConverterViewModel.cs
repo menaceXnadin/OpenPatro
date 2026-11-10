@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using OpenPatro.Infrastructure;
@@ -152,6 +153,55 @@ public sealed class DateConverterViewModel : BindableBase
     {
         get => _resultIsVerified;
         private set => SetProperty(ref _resultIsVerified, value);
+    }
+
+    /// <summary>
+    /// Pre-fills today's date (in the currently selected source calendar) if the
+    /// input is empty. Today's BS date comes from the local calendar DB.
+    /// </summary>
+    public async Task EnsureDefaultInputAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(InputDate))
+        {
+            return;
+        }
+
+        InputDate = await GetTodayInputAsync(ConversionDirection);
+    }
+
+    /// <summary>
+    /// Switches the source calendar. The input is reset to today in the new calendar,
+    /// because a BS year typed for BS→AD is meaningless as an AD year (and vice versa).
+    /// </summary>
+    public async Task SetDirectionAsync(string direction)
+    {
+        if (string.Equals(ConversionDirection, direction, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        ConversionDirection = direction;
+        ErrorMessage = string.Empty;
+        InputDate = await GetTodayInputAsync(direction);
+    }
+
+    private async Task<string> GetTodayInputAsync(string direction)
+    {
+        if (string.Equals(direction, "AD", StringComparison.Ordinal))
+        {
+            return _services.Clock.GetNepalToday().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        try
+        {
+            var today = await _services.CalendarRepository.GetTodayAsync();
+            return today is null ? string.Empty : $"{today.BsYear:0000}-{today.BsMonth:00}-{today.BsDay:00}";
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"DateConverterViewModel: today lookup failed: {ex}");
+            return string.Empty;
+        }
     }
 
     /// <summary>

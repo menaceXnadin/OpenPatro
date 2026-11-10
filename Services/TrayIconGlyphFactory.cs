@@ -14,6 +14,7 @@ namespace OpenPatro.Services;
 public static class TrayIconGlyphFactory
 {
     private static PrivateFontCollection? _fontCollection;
+    private static FontFamily? _fallbackFontFamily;
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -146,8 +147,8 @@ public static class TrayIconGlyphFactory
             // Fall through to fallback.
         }
 
-        // Fallback: use a system font.
-        return new FontFamily("Segoe UI");
+        // Fallback: use a system font (cached; this runs on every icon refresh).
+        return _fallbackFontFamily ??= new FontFamily("Segoe UI");
     }
 
     /// <summary>

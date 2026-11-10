@@ -22,8 +22,6 @@ public sealed partial class HamroPatroParser
     private static readonly string[] KaranaNames = { "बव", "बालव", "कौलव", "तैतिल", "गर", "वणिज", "विष्टि/भद्रा", "शकुनि", "चतुष्पद", "नाग", "किंस्तुघ्न" };
     private static readonly string[] NakshatraNames = { "अश्विनी", "भरणी", "कृत्तिका", "रोहिणी", "मृगशिरा", "आर्द्रा", "पुनर्वसु", "पुष्य", "अश्लेषा", "मघा", "पूर्वफल्गुनी", "उत्तरफल्गुनी", "हस्ता", "चित्रा", "स्वाति", "विशाखा", "अनुराधा", "ज्येष्ठा", "मूल", "पूर्वाषाढा", "उत्तरषाढा", "श्रवण", "धनिष्ठा", "शतभिषा", "पूर्वभाद्र", "उत्तरभाद्र", "रेवती" };
 
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-
     public ParsedCalendarMonth ParseMonthHtml(int requestedYear, int requestedMonth, string html)
     {
         var month = ExtractInitialMonths(html).FirstOrDefault(m => m.YearBs == requestedYear && m.MonthBs == requestedMonth)
@@ -66,7 +64,7 @@ public sealed partial class HamroPatroParser
             throw new InvalidOperationException("Calendar months missing from bootstrap data.");
         }
 
-        return initialMonths.Deserialize<List<HpMonth>>(JsonOptions) ?? throw new InvalidOperationException("Calendar months could not be read.");
+        return initialMonths.Deserialize(HpJsonContext.Default.ListHpMonth) ?? throw new InvalidOperationException("Calendar months could not be read.");
     }
 
     private static CalendarDayRecord ParseDay(HpMonth month, HpDay day)
@@ -124,6 +122,13 @@ public sealed partial class HamroPatroParser
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex WhitespaceRegex();
+
+    /// <summary>Trim-safe metadata for the page's bootstrap JSON (case-insensitive, as before).</summary>
+    [JsonSourceGenerationOptions(PropertyNameCaseInsensitive = true)]
+    [JsonSerializable(typeof(List<HpMonth>))]
+    private sealed partial class HpJsonContext : JsonSerializerContext
+    {
+    }
 
     private sealed class HpMonth
     {

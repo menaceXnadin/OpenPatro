@@ -10,4 +10,11 @@
     <Platform Solution="*|x86" Project="x86" />
     <Deploy />
   </Project>
+  <Folder Name="/tests/">
+    <Project Path="tests/OpenPatro.Tests/OpenPatro.Tests.csproj">
+      <Platform Project="x64" />
+      <Build Solution="*|ARM64" Project="false" />
+      <Build Solution="*|x86" Project="false" />
+    </Project>
+  </Folder>
 </Solution>

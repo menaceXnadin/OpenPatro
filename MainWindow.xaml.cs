@@ -184,7 +184,7 @@ namespace OpenPatro
             UpdateCalendarLayout();
             SyncCalendarNavigationSelections();
             UpdateDateConverterMonthLabels();
-            SyncDateConverterInputParts();
+            _ = InitializeDateConverterInputAsync();
             SyncBullionRangeSelection();
             SyncBullionItemsPerPageSelection();
             UpdateBullionRangeSummaryLabel();
@@ -510,6 +510,12 @@ namespace OpenPatro
             if (_suppressNavCheckedEvents) return;
             ViewModel.SelectedSection = ShellSection.DateConverter;
             UpdateSectionVisibility();
+            _ = InitializeDateConverterInputAsync();
+        }
+
+        private async Task InitializeDateConverterInputAsync()
+        {
+            await ViewModel.DateConverter.EnsureDefaultInputAsync();
             SyncDateConverterInputParts();
         }
 
@@ -931,6 +937,11 @@ namespace OpenPatro
             try
             {
                 var services = ((App)Application.Current).Services;
+                if (AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Minimized })
+                {
+                    return; // minimized windows report an off-screen position and tiny size
+                }
+
                 var isMaximized = AppWindow.Presenter is OverlappedPresenter p
                                   && p.State == OverlappedPresenterState.Maximized;
 
@@ -1004,9 +1015,19 @@ namespace OpenPatro
             }
 
             _suppressCalendarNavigationSelectionEvents = true;
-            await ViewModel.Calendar.NavigateToYearAsync(year);
-            SyncCalendarNavigationSelections();
-            _suppressCalendarNavigationSelectionEvents = false;
+            try
+            {
+                await ViewModel.Calendar.NavigateToYearAsync(year);
+                SyncCalendarNavigationSelections();
+            }
+            catch (Exception ex)
+            {
+                App.Log($"Calendar year navigation FAILED: {ex}");
+            }
+            finally
+            {
+                _suppressCalendarNavigationSelectionEvents = false;
+            }
         }
 
         private async void CalendarMonthPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1022,9 +1043,19 @@ namespace OpenPatro
             }
 
             _suppressCalendarNavigationSelectionEvents = true;
-            await ViewModel.Calendar.NavigateToMonthAsync(month.MonthNumber);
-            SyncCalendarNavigationSelections();
-            _suppressCalendarNavigationSelectionEvents = false;
+            try
+            {
+                await ViewModel.Calendar.NavigateToMonthAsync(month.MonthNumber);
+                SyncCalendarNavigationSelections();
+            }
+            catch (Exception ex)
+            {
+                App.Log($"Calendar month navigation FAILED: {ex}");
+            }
+            finally
+            {
+                _suppressCalendarNavigationSelectionEvents = false;
+            }
         }
 
         private void SyncCalendarNavigationSelections()
@@ -1226,10 +1257,6 @@ namespace OpenPatro
             }
 
             var currentState = presenter.State;
-            if (_lastPresenterState == OverlappedPresenterState.Maximized && currentState == OverlappedPresenterState.Restored)
-            {
-                _ = TryResizeToInitialWindowSize();
-            }
 
             // Persist state on maximize/minimize transitions too.
             if (_lastPresenterState != currentState)
@@ -1302,9 +1329,15 @@ namespace OpenPatro
             if (SaitYearPicker.SelectedItem is not string year) return;
 
             _suppressSaitSelectionEvents = true;
-            ViewModel.ShubhaSait.SelectedYear = year;
-            SyncShubhaSaitSelections();
-            _suppressSaitSelectionEvents = false;
+            try
+            {
+                ViewModel.ShubhaSait.SelectedYear = year;
+                SyncShubhaSaitSelections();
+            }
+            finally
+            {
+                _suppressSaitSelectionEvents = false;
+            }
         }
 
         private void SaitCategoryPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1313,9 +1346,15 @@ namespace OpenPatro
             if (SaitCategoryPicker.SelectedItem is not SaitCategoryInfo cat) return;
 
             _suppressSaitSelectionEvents = true;
-            ViewModel.ShubhaSait.SelectedCategoryKey = cat.FullKey;
-            SyncShubhaSaitSelections();
-            _suppressSaitSelectionEvents = false;
+            try
+            {
+                ViewModel.ShubhaSait.SelectedCategoryKey = cat.FullKey;
+                SyncShubhaSaitSelections();
+            }
+            finally
+            {
+                _suppressSaitSelectionEvents = false;
+            }
         }
 
         private async void SaitRefreshButton_Click(object sender, RoutedEventArgs e)
@@ -1323,18 +1362,24 @@ namespace OpenPatro
             if (ViewModel.ShubhaSait.IsBusy) return;
 
             _suppressSaitSelectionEvents = true;
-            await ViewModel.ShubhaSait.RefreshAsync();
-            SyncShubhaSaitSelections();
-            _suppressSaitSelectionEvents = false;
+            try
+            {
+                await ViewModel.ShubhaSait.RefreshAsync();
+                SyncShubhaSaitSelections();
+            }
+            finally
+            {
+                _suppressSaitSelectionEvents = false;
+            }
         }
 
         // ── Date Converter handlers (using cached references) ──
 
-        private void DateConverterDirection_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async void DateConverterDirection_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (((ComboBox)sender).SelectedItem is ComboBoxItem item && item.Tag is string direction)
             {
-                ViewModel.DateConverter.ConversionDirection = direction;
+                await ViewModel.DateConverter.SetDirectionAsync(direction);
             }
 
             UpdateDateConverterMonthLabels();
@@ -1526,7 +1571,7 @@ namespace OpenPatro
 
         private async void GitHubSupportButton_Click(object sender, RoutedEventArgs e)
         {
-            await OpenSupportLinkAsync("https://github.com/menaceXnadin");
+            await OpenSupportLinkAsync("https://github.com/menaceXnadin/OpenPatro");
         }
 
         private async void LinkedInSupportButton_Click(object sender, RoutedEventArgs e)
@@ -1581,25 +1626,28 @@ namespace OpenPatro
             }
 
             var source = ViewModel.DateConverter.InputDate;
-            var year = DateTime.Now.Year;
-            var month = DateTime.Now.Month;
-            var day = DateTime.Now.Day;
-
-            if (!string.IsNullOrWhiteSpace(source))
+            var parts = (source ?? string.Empty).Split('-', StringSplitOptions.TrimEntries);
+            if (parts.Length != 3
+                || !int.TryParse(parts[0], out var year)
+                || !int.TryParse(parts[1], out var month)
+                || !int.TryParse(parts[2], out var day)
+                || year <= 0
+                || month is < 1 or > 12
+                || day is < 1 or > 32)
             {
-                var parts = source.Split('-', StringSplitOptions.TrimEntries);
-                if (parts.Length == 3
-                    && int.TryParse(parts[0], out var parsedYear)
-                    && int.TryParse(parts[1], out var parsedMonth)
-                    && int.TryParse(parts[2], out var parsedDay)
-                    && parsedYear > 0
-                    && parsedMonth is >= 1 and <= 12
-                    && parsedDay is >= 1 and <= 32)
+                _suppressDateConverterInputSync = true;
+                try
                 {
-                    year = parsedYear;
-                    month = parsedMonth;
-                    day = parsedDay;
+                    _dateConverterYearBox.Text = string.Empty;
+                    _dateConverterMonthPicker.SelectedItem = null;
+                    _dateConverterDayBox.Text = string.Empty;
                 }
+                finally
+                {
+                    _suppressDateConverterInputSync = false;
+                }
+
+                return;
             }
 
             _suppressDateConverterInputSync = true;
@@ -2009,6 +2057,12 @@ namespace OpenPatro
                     r.SilverPer10g,
                     ParseBullionPrice(r.SilverPerTola)))
                 .ToList();
+
+            // FormatPrice renders a missing price as "--", which parses to 0. Plotting
+            // those would dive the line to zero and flatten the scale, so drop them.
+            hallmarkSeries.RemoveAll(p => p.Value <= 0);
+            tejabiSeries.RemoveAll(p => p.Value <= 0);
+            silverSeries.RemoveAll(p => p.Value <= 0);
 
             _bullionChartSeries["hallmark"] = hallmarkSeries;
             _bullionChartSeries["tejabi"] = tejabiSeries;

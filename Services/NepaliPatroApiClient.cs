@@ -24,10 +24,16 @@ public sealed class NepaliPatroApiClient
     private static readonly byte[] SchemeBKey = Encoding.UTF8.GetBytes("a2jqb2nw5266etzl");
     private static readonly byte[] SchemeBIv = Encoding.UTF8.GetBytes("lnous4x06o82jux5");
 
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private readonly HttpClient _httpClient;
 
     public NepaliPatroApiClient()
+        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(20) })
     {
+    }
+
+    internal NepaliPatroApiClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenPatro/1.0");
     }
 
@@ -37,7 +43,7 @@ public sealed class NepaliPatroApiClient
     public async Task<RashifalResponse?> FetchRashifalAsync(CancellationToken cancellationToken = default)
     {
         var json = await _httpClient.GetStringAsync(RashifalUri, cancellationToken);
-        return JsonSerializer.Deserialize<RashifalResponse>(json);
+        return JsonSerializer.Deserialize(json, AppJsonContext.Default.RashifalResponse);
     }
 
     /// <summary>
@@ -60,12 +66,12 @@ public sealed class NepaliPatroApiClient
     /// </summary>
     public async Task<DateConvertResponse?> ConvertDateAsync(DateConvertRequest request, CancellationToken cancellationToken = default)
     {
-        var requestJson = JsonSerializer.Serialize(request);
-        var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync(DateConvertUri, content, cancellationToken);
+        var requestJson = JsonSerializer.Serialize(request, AppJsonContext.Default.DateConvertRequest);
+        using var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+        using var response = await _httpClient.PostAsync(DateConvertUri, content, cancellationToken);
         response.EnsureSuccessStatusCode();
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonSerializer.Deserialize<DateConvertResponse>(responseJson);
+        return JsonSerializer.Deserialize(responseJson, AppJsonContext.Default.DateConvertResponse);
     }
 
     /// <summary>

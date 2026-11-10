@@ -9,12 +9,18 @@ namespace OpenPatro.Services;
 
 public sealed class HamroPatroClient
 {
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(15) };
+    private readonly HttpClient _httpClient;
     private readonly HamroPatroParser _parser;
 
     public HamroPatroClient(HamroPatroParser parser)
+        : this(parser, new HttpClient { Timeout = TimeSpan.FromSeconds(15) })
+    {
+    }
+
+    internal HamroPatroClient(HamroPatroParser parser, HttpClient httpClient)
     {
         _parser = parser;
+        _httpClient = httpClient;
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenPatro/1.0");
     }
 

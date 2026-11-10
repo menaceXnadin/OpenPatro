@@ -32,15 +32,23 @@ public class ApplicationPaths
 
     public static ApplicationPaths Create()
     {
-        var localFolderPath = IsRunningAsPackagedApp()
-            ? Windows.Storage.ApplicationData.Current.LocalFolder.Path
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenPatro");
-
+        var localFolderPath = ResolveLocalFolderPath();
         Directory.CreateDirectory(localFolderPath);
         return new ApplicationPaths(localFolderPath);
     }
 
-    private static bool IsRunningAsPackagedApp()
+    /// <summary>
+    /// The per-user data folder: package LocalFolder when MSIX-packaged,
+    /// otherwise %LocalAppData%\OpenPatro. Safe to call before services exist.
+    /// </summary>
+    public static string ResolveLocalFolderPath()
+    {
+        return IsRunningAsPackagedApp()
+            ? Windows.Storage.ApplicationData.Current.LocalFolder.Path
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OpenPatro");
+    }
+
+    public static bool IsRunningAsPackagedApp()
     {
         var length = 0;
         var result = GetCurrentPackageFullName(ref length, null);

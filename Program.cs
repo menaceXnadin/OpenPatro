@@ -1,5 +1,7 @@
 using Microsoft.Windows.AppLifecycle;
 using System;
+using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 
 namespace OpenPatro;
 
@@ -25,7 +27,7 @@ public static class Program
             try
             {
                 var activationArgs = AppInstance.GetCurrent().GetActivatedEventArgs();
-                instance.RedirectActivationToAsync(activationArgs).GetAwaiter().GetResult();
+                RedirectActivationTo(activationArgs, instance);
             }
             catch
             {
@@ -48,6 +50,57 @@ public static class Program
             _ = new App();
         });
     }
+
+    /// <summary>
+    /// Microsoft's documented single-instancing pattern: redirect on a worker thread and
+    /// pump COM on this STA thread while waiting. Blocking the STA thread with
+    /// GetAwaiter().GetResult() can deadlock if the redirect calls back into it.
+    /// </summary>
+    private static void RedirectActivationTo(AppActivationArguments args, AppInstance keyInstance)
+    {
+        var redirectEvent = CreateEvent(IntPtr.Zero, bManualReset: true, bInitialState: false, lpName: null);
+        if (redirectEvent == IntPtr.Zero)
+        {
+            return;
+        }
+
+        try
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    keyInstance.RedirectActivationToAsync(args).AsTask().Wait();
+                }
+                finally
+                {
+                    SetEvent(redirectEvent);
+                }
+            });
+
+            const uint cwmoDefault = 0;
+            const uint timeoutMs = 10_000; // never hang the second process forever
+            _ = CoWaitForMultipleObjects(cwmoDefault, timeoutMs, 1, new[] { redirectEvent }, out _);
+        }
+        finally
+        {
+            CloseHandle(redirectEvent);
+        }
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr CreateEvent(IntPtr lpEventAttributes, bool bManualReset, bool bInitialState, string? lpName);
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetEvent(IntPtr hEvent);
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr hObject);
+
+    [DllImport("ole32.dll")]
+    private static extern int CoWaitForMultipleObjects(uint dwFlags, uint dwMilliseconds, uint nHandles, IntPtr[] pHandles, out uint lpdwIndex);
 
     private static void OnInstanceActivated(object? sender, AppActivationArguments args)
     {

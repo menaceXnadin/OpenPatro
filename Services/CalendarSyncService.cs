@@ -39,31 +39,44 @@ public sealed class CalendarSyncService
         }
     }
 
-    public async Task RunSilentRefreshAsync(CancellationToken cancellationToken = default)
+    public const string SilentSyncSettingKey = "CalendarSilentSyncDate";
+
+    /// <summary>
+    /// Re-downloads the current and next BS month. Runs at most once per Nepal day unless
+    /// <paramref name="force"/> is set (the Settings "Refresh current data now" button).
+    /// Returns false if the refresh was attempted and failed; never throws.
+    /// </summary>
+    public async Task<bool> RunSilentRefreshAsync(bool force = false, CancellationToken cancellationToken = default)
     {
         try
         {
             var today = await _calendarRepository.GetTodayAsync();
             if (today is null)
             {
-                return;
+                return false;
             }
 
             var syncMarker = _clock.GetNepalToday().ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
-            var lastSyncMarker = await _userRepository.GetSettingAsync("CalendarSilentSyncDate");
-            if (string.Equals(syncMarker, lastSyncMarker, StringComparison.Ordinal))
+            if (!force)
             {
-                return;
+                var lastSyncMarker = await _userRepository.GetSettingAsync(SilentSyncSettingKey);
+                if (string.Equals(syncMarker, lastSyncMarker, StringComparison.Ordinal))
+                {
+                    return true;
+                }
             }
 
             await RefreshMonthAsync(today.BsYear, today.BsMonth, cancellationToken);
             var nextMonth = GetNextMonth(today.BsYear, today.BsMonth);
             await RefreshMonthAsync(nextMonth.year, nextMonth.month, cancellationToken);
-            await _userRepository.SetSettingAsync("CalendarSilentSyncDate", syncMarker);
+            await _userRepository.SetSettingAsync(SilentSyncSettingKey, syncMarker);
+            return true;
         }
-        catch
+        catch (Exception ex)
         {
-            // Silent background refresh by design.
+            // Background refresh is best-effort; the local DB keeps serving the calendar.
+            OpenPatro.Infrastructure.DiagnosticLog.Error($"Calendar refresh FAILED: {ex.Message}");
+            return false;
         }
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 
@@ -80,11 +81,14 @@ public sealed class WindowBoundsService
     {
         try
         {
-            await _userRepository.SetSettingAsync(KeyWindowX, x.ToString(CultureInfo.InvariantCulture));
-            await _userRepository.SetSettingAsync(KeyWindowY, y.ToString(CultureInfo.InvariantCulture));
-            await _userRepository.SetSettingAsync(KeyWindowWidth, width.ToString(CultureInfo.InvariantCulture));
-            await _userRepository.SetSettingAsync(KeyWindowHeight, height.ToString(CultureInfo.InvariantCulture));
-            await _userRepository.SetSettingAsync(KeyWindowState, isMaximized ? StateMaximized : StateRestored);
+            await _userRepository.SetSettingsAsync(new Dictionary<string, string>
+            {
+                [KeyWindowX] = x.ToString(CultureInfo.InvariantCulture),
+                [KeyWindowY] = y.ToString(CultureInfo.InvariantCulture),
+                [KeyWindowWidth] = width.ToString(CultureInfo.InvariantCulture),
+                [KeyWindowHeight] = height.ToString(CultureInfo.InvariantCulture),
+                [KeyWindowState] = isMaximized ? StateMaximized : StateRestored
+            });
         }
         catch
         {

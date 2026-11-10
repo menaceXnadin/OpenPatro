@@ -5,7 +5,7 @@ namespace OpenPatro.Infrastructure;
 
 public sealed class AppServices
 {
-    private AppServices(
+    internal AppServices(
         ApplicationPaths paths,
         NepalTimeService clock,
         CalendarRepository calendarRepository,
@@ -14,7 +14,6 @@ public sealed class AppServices
         ShareHubNepseClient shareHubNepse,
         CalendarSyncService calendarSync,
         StartupService startup,
-        TrayNotificationService notifications,
         BundledCalendarSeedService bundledSeed,
         NepaliPatroApiClient nepaliPatroApi,
         WindowBoundsService windowBounds,
@@ -29,7 +28,6 @@ public sealed class AppServices
         ShareHubNepse = shareHubNepse;
         CalendarSync = calendarSync;
         Startup = startup;
-        Notifications = notifications;
         BundledSeed = bundledSeed;
         NepaliPatroApi = nepaliPatroApi;
         WindowBounds = windowBounds;
@@ -52,8 +50,6 @@ public sealed class AppServices
     public CalendarSyncService CalendarSync { get; }
 
     public StartupService Startup { get; }
-
-    public TrayNotificationService Notifications { get; }
 
     public BundledCalendarSeedService BundledSeed { get; }
 
@@ -79,13 +75,12 @@ public sealed class AppServices
         var shareHubNepse = new ShareHubNepseClient();
         var calendarSync = new CalendarSyncService(clock, calendarRepository, hamroPatro, userRepository);
         var startup = new StartupService();
-        var notifications = new TrayNotificationService(userRepository);
         var bundledSeed = new BundledCalendarSeedService(paths, parser);
         var nepaliPatroApi = new NepaliPatroApiClient();
         var windowBounds = new WindowBoundsService(userRepository);
         var bullion = new BullionClient();
         var forex = new ForexClient();
 
-        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, shareHubNepse, calendarSync, startup, notifications, bundledSeed, nepaliPatroApi, windowBounds, bullion, forex);
+        return new AppServices(paths, clock, calendarRepository, userRepository, hamroPatro, shareHubNepse, calendarSync, startup, bundledSeed, nepaliPatroApi, windowBounds, bullion, forex);
     }
 }
