@@ -293,7 +293,7 @@ public sealed class ShubhaSaitViewModel : BindableBase
         var monthWise = new List<SaitMonthDaysInfo>();
         foreach (var monthKey in monthData.Keys.OrderBy(static m => ParseSortableInt(m)))
         {
-            var displayName = BsMonthNames.TryGetValue(monthKey, out var name) ? name : $"Month {monthKey}";
+            var displayName = BsMonthNames.TryGetValue(NormalizeMonthKey(monthKey), out var name) ? name : $"Month {monthKey}";
             months.Add(new SaitMonthInfo(monthKey, displayName));
             if (monthData.TryGetValue(monthKey, out var days))
             {
@@ -328,24 +328,11 @@ public sealed class ShubhaSaitViewModel : BindableBase
         AuspiciousDays.ReplaceAll(days);
     }
 
-    /// <summary>
-    /// Gets the auspicious days for a specific year, category, and month programmatically.
-    /// </summary>
-    public List<string> GetAuspiciousDays(string year, string categoryFullKey, string month)
+    private static string NormalizeMonthKey(string monthKey)
     {
-        if (_cachedData is null)
-        {
-            return new List<string>();
-        }
-
-        if (!_cachedData.TryGetValue(year, out var yearData) ||
-            !yearData.TryGetValue(categoryFullKey, out var monthData) ||
-            !monthData.TryGetValue(month, out var days))
-        {
-            return new List<string>();
-        }
-
-        return new List<string>(days);
+        return int.TryParse(monthKey, out var month) && month is >= 1 and <= 12
+            ? month.ToString("00", System.Globalization.CultureInfo.InvariantCulture)
+            : monthKey;
     }
 
     private static int ParseSortableInt(string value)

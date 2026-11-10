@@ -156,26 +156,6 @@ public sealed class CalendarRepository
         return results;
     }
 
-    public async Task<CalendarDayRecord?> GetDayAsync(int year, int month, int day)
-    {
-        await using var connection = new SqliteConnection($"Data Source={_paths.CalendarDatabasePath}");
-        await connection.OpenAsync();
-
-        var command = connection.CreateCommand();
-        command.CommandText = """
-            SELECT BsYear, BsMonth, BsDay, BsDayText, BsMonthName, BsFullDate, NepaliWeekday,
-                   AdDateIso, AdDateText, EventSummary, Tithi, LunarText, Panchanga, DetailsPath, IsHoliday
-            FROM CalendarDays
-            WHERE BsYear = $year AND BsMonth = $month AND BsDay = $day;
-            """;
-        command.Parameters.AddWithValue("$year", year);
-        command.Parameters.AddWithValue("$month", month);
-        command.Parameters.AddWithValue("$day", day);
-
-        await using var reader = await command.ExecuteReaderAsync();
-        return await reader.ReadAsync() ? ReadDay(reader) : null;
-    }
-
     public async Task<CalendarDayRecord?> GetTodayAsync()
     {
         return await GetByAdDateAsync(_clock.GetNepalToday().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));

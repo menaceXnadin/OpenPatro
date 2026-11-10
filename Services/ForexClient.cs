@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
@@ -23,15 +24,16 @@ public sealed class ForexClient
     private static readonly Uri HistoryUri =
         new("https://api.nepalipatro.com.np/forex/currencycode", UriKind.Absolute);
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true
-    };
-
-    private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(20) };
+    private readonly HttpClient _httpClient;
 
     public ForexClient()
+        : this(new HttpClient { Timeout = TimeSpan.FromSeconds(20) })
     {
+    }
+
+    internal ForexClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("OpenPatro/1.0");
     }
 
@@ -41,7 +43,7 @@ public sealed class ForexClient
     public async Task<ForexTodayResponse?> FetchTodayAsync(CancellationToken cancellationToken = default)
     {
         var json = await _httpClient.GetStringAsync(TodayUri, cancellationToken);
-        return JsonSerializer.Deserialize<ForexTodayResponse>(json, JsonOptions);
+        return JsonSerializer.Deserialize(json, ForexJsonContext.Default.ForexTodayResponse);
     }
 
     /// <summary>
@@ -54,19 +56,20 @@ public sealed class ForexClient
         DateOnly to,
         CancellationToken cancellationToken = default)
     {
-        var payload = JsonSerializer.Serialize(new
-        {
-            currency_code = currencyCode,
-            from = from.ToString("yyyy-MM-dd"),
-            to = to.ToString("yyyy-MM-dd")
-        });
+        var payload = JsonSerializer.Serialize(
+            new ForexHistoryRequest(
+                currencyCode,
+                // Invariant culture: the API needs Gregorian dates even on e.g. Thai/Arabic locales.
+                from.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                to.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+            ForexJsonContext.Default.ForexHistoryRequest);
 
-        var content = new StringContent(payload, Encoding.UTF8, "application/json");
-        var response = await _httpClient.PostAsync(HistoryUri, content, cancellationToken);
+        using var content = new StringContent(payload, Encoding.UTF8, "application/json");
+        using var response = await _httpClient.PostAsync(HistoryUri, content, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);
-        return JsonSerializer.Deserialize<List<ForexHistoryEntry>>(json, JsonOptions)
+        return JsonSerializer.Deserialize(json, ForexJsonContext.Default.ListForexHistoryEntry)
                ?? new List<ForexHistoryEntry>();
     }
 }

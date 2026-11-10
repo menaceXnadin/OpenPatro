@@ -4,13 +4,14 @@
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  IgnorableNamespaces="uap uap5 rescap">
 
   <Identity
     Name="e38b3105-4b4f-466f-af46-cfdf079a7e30"
     Publisher="CN=MenaceXnadin"
-    Version="1.0.1.0" />
+    Version="1.0.2.0" />
 
   <mp:PhoneIdentity PhoneProductId="e38b3105-4b4f-466f-af46-cfdf079a7e30" PhonePublisherId="00000000-0000-0000-0000-000000000000"/>
 
@@ -42,6 +43,13 @@
         <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
         <uap:SplashScreen Image="Assets\SplashScreen.png" />
       </uap:VisualElements>
+      <Extensions>
+        <!-- Packaged (MSIX) autostart. HKCU\...\Run writes are virtualized inside a
+             package, so StartupService uses this task instead when packaged. -->
+        <uap5:Extension Category="windows.startupTask">
+          <uap5:StartupTask TaskId="OpenPatroStartup" Enabled="false" DisplayName="OpenPatro" />
+        </uap5:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

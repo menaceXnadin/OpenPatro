@@ -23,9 +23,9 @@ build-test.log
 __pycache__/
 *.pyc
 
-# Local data/runtime artifacts
-calendar.db
-failed.txt
+# Local data/runtime artifacts (repo root only: Assets/Data/calendar.db is the bundled seed and MUST be committed)
+/calendar.db
+/failed.txt
 log-tail.txt
 
 # Local sample input files

@@ -514,7 +514,8 @@ public sealed class ForexViewModel : BindableBase
         // Cancel any in-flight request
         _historyCts?.Cancel();
         _historyCts?.Dispose();
-        _historyCts = new CancellationTokenSource();
+        var cts = new CancellationTokenSource();
+        _historyCts = cts;
 
         IsHistoryBusy = true;
         HistoryError = string.Empty;
@@ -522,11 +523,15 @@ public sealed class ForexViewModel : BindableBase
 
         try
         {
-            var to = DateOnly.FromDateTime(DateTime.Today);
+            var to = _services.Clock.GetNepalToday();
             var from = to.AddDays(-30);
 
             var history = await _services.Forex.FetchHistoryAsync(
-                row.Code, from, to, _historyCts.Token);
+                row.Code, from, to, cts.Token);
+            if (!ReferenceEquals(_historyCts, cts))
+            {
+                return; // the user picked another currency meanwhile
+            }
 
             if (history.Count == 0)
             {
@@ -567,12 +572,19 @@ public sealed class ForexViewModel : BindableBase
         }
         catch (Exception ex)
         {
-            HistoryError = $"Failed to load history: {ex.Message}";
+            if (ReferenceEquals(_historyCts, cts))
+            {
+                HistoryError = $"Failed to load history: {ex.Message}";
+            }
+
             Debug.WriteLine($"ForexViewModel history error: {ex}");
         }
         finally
         {
-            IsHistoryBusy = false;
+            if (ReferenceEquals(_historyCts, cts))
+            {
+                IsHistoryBusy = false;
+            }
         }
     }
 
@@ -762,7 +774,8 @@ public sealed class ForexViewModel : BindableBase
 
         _trendCts?.Cancel();
         _trendCts?.Dispose();
-        _trendCts = new CancellationTokenSource();
+        var cts = new CancellationTokenSource();
+        _trendCts = cts;
 
         IsTrendBusy = true;
         TrendError = string.Empty;
@@ -770,7 +783,7 @@ public sealed class ForexViewModel : BindableBase
 
         try
         {
-            var to = DateOnly.FromDateTime(DateTime.Today);
+            var to = _services.Clock.GetNepalToday();
             var days = SelectedTrendRange switch
             {
                 "2D" => 2,
@@ -781,7 +794,11 @@ public sealed class ForexViewModel : BindableBase
 
             var from = to.AddDays(-(days - 1));
             var history = await _services.Forex.FetchHistoryAsync(
-                TrendCurrency.Code, from, to, _trendCts.Token);
+                TrendCurrency.Code, from, to, cts.Token);
+            if (!ReferenceEquals(_trendCts, cts))
+            {
+                return; // a newer currency/range request superseded this one
+            }
 
             if (history.Count == 0)
             {
@@ -808,12 +825,19 @@ public sealed class ForexViewModel : BindableBase
         }
         catch (Exception ex)
         {
-            TrendError = $"Failed to load trend: {ex.Message}";
+            if (ReferenceEquals(_trendCts, cts))
+            {
+                TrendError = $"Failed to load trend: {ex.Message}";
+            }
+
             Debug.WriteLine($"ForexViewModel trend error: {ex}");
         }
         finally
         {
-            IsTrendBusy = false;
+            if (ReferenceEquals(_trendCts, cts))
+            {
+                IsTrendBusy = false;
+            }
         }
     }
 

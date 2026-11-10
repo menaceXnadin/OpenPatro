@@ -577,7 +577,7 @@
                                         </Grid>
                                         <StackPanel Grid.Column="1" Spacing="2">
                                             <TextBlock Text="GitHub" FontWeight="SemiBold" />
-                                            <TextBlock Text="https://github.com/menaceXnadin" Opacity="0.62" TextWrapping="Wrap" />
+                                            <TextBlock Text="https://github.com/menaceXnadin/OpenPatro" Opacity="0.62" TextWrapping="Wrap" />
                                             <TextBlock Text="Explore and star the project" Opacity="0.62" FontSize="12" />
                                         </StackPanel>
                                         <Button Grid.Column="2" Click="GitHubSupportButton_Click" VerticalAlignment="Center">Open link</Button>

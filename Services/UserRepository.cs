@@ -39,6 +39,29 @@ public sealed class UserRepository
         await command.ExecuteNonQueryAsync();
     }
 
+    /// <summary>Upserts several settings in a single connection and transaction.</summary>
+    public async Task SetSettingsAsync(IReadOnlyDictionary<string, string> values)
+    {
+        await using var connection = new SqliteConnection($"Data Source={_paths.UserDatabasePath}");
+        await connection.OpenAsync();
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync();
+        foreach (var (key, value) in values)
+        {
+            await using var command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO Settings (Key, Value)
+                VALUES ($key, $value)
+                ON CONFLICT(Key) DO UPDATE SET Value = excluded.Value;
+                """;
+            command.Parameters.AddWithValue("$key", key);
+            command.Parameters.AddWithValue("$value", value);
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await transaction.CommitAsync();
+    }
+
     public async Task<string?> GetNoteAsync(int year, int month, int day)
     {
         await using var connection = new SqliteConnection($"Data Source={_paths.UserDatabasePath}");

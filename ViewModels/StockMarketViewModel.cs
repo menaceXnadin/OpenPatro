@@ -359,7 +359,7 @@ public sealed class StockMarketViewModel : BindableBase
         }
     }
 
-    private void MapResponse(StockMarketHomeData response)
+    internal void MapResponse(StockMarketHomeData response)
     {
         var status = response.MarketStatus?.Status?.Trim();
         MarketStatus = string.IsNullOrWhiteSpace(status) ? "UNKNOWN" : status.ToUpperInvariant();
@@ -517,30 +517,32 @@ public sealed class StockMarketViewModel : BindableBase
                 "Tx",
                 m.LogoPath)));
 
+        // Named arguments: this constructor has 22 positional parameters and the
+        // turnover/quantity strings were once passed in swapped order.
         ReplaceCollection(LiveCompanies, (response.LiveCompanyData ?? new List<LiveCompanyDataInfo>())
             .Select(c => new LiveCompanyRowViewModel(
-                c.Symbol,
-                NormalizeWhitespace(c.SecurityName),
-                NormalizeWhitespace(c.Sector ?? string.Empty),
-                c.OpenPrice.ToString("N2", CultureInfo.InvariantCulture),
-                c.HighPrice.ToString("N2", CultureInfo.InvariantCulture),
-                c.LowPrice.ToString("N2", CultureInfo.InvariantCulture),
-                c.LastTradedPrice.ToString("N2", CultureInfo.InvariantCulture),
-                c.PreviousClose.ToString("N2", CultureInfo.InvariantCulture),
-                $"{c.PercentageChange:+0.##;-0.##;0}%",
-                c.TotalTradeQuantity.ToString("N2", CultureInfo.InvariantCulture),
-                c.TotalTradeValue.ToString("N2", CultureInfo.InvariantCulture),
-                c.TotalTransactions.ToString("N0", CultureInfo.InvariantCulture),
-                c.OpenPrice,
-                c.HighPrice,
-                c.LowPrice,
-                c.LastTradedPrice,
-                c.PreviousClose,
-                c.PercentageChange,
-                c.TotalTradeQuantity,
-                c.TotalTradeValue,
-                c.TotalTransactions,
-                c.LogoPath)));
+                symbol: c.Symbol,
+                securityName: NormalizeWhitespace(c.SecurityName),
+                sector: NormalizeWhitespace(c.Sector ?? string.Empty),
+                open: c.OpenPrice.ToString("N2", CultureInfo.InvariantCulture),
+                high: c.HighPrice.ToString("N2", CultureInfo.InvariantCulture),
+                low: c.LowPrice.ToString("N2", CultureInfo.InvariantCulture),
+                ltp: c.LastTradedPrice.ToString("N2", CultureInfo.InvariantCulture),
+                prevClose: c.PreviousClose.ToString("N2", CultureInfo.InvariantCulture),
+                changePercent: $"{c.PercentageChange:+0.##;-0.##;0}%",
+                turnover: c.TotalTradeValue.ToString("N2", CultureInfo.InvariantCulture),
+                quantity: c.TotalTradeQuantity.ToString("N2", CultureInfo.InvariantCulture),
+                transactions: c.TotalTransactions.ToString("N0", CultureInfo.InvariantCulture),
+                openValue: c.OpenPrice,
+                highValue: c.HighPrice,
+                lowValue: c.LowPrice,
+                ltpValue: c.LastTradedPrice,
+                previousCloseValue: c.PreviousClose,
+                changePercentValue: c.PercentageChange,
+                quantityValue: c.TotalTradeQuantity,
+                turnoverValue: c.TotalTradeValue,
+                transactionsValue: c.TotalTransactions,
+                logoPath: c.LogoPath)));
 
         ApplySectorSort();
         

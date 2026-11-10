@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Input;
 using OpenPatro.Infrastructure;
@@ -62,7 +63,8 @@ public sealed class BullionRowViewModel
 /// </summary>
 public sealed class BullionViewModel : BindableBase
 {
-    private const int DefaultItemsPerPage = 120;
+    // Must be one of the page-size picker options (25/50/100/200/500) in MainWindow.xaml.
+    private const int DefaultItemsPerPage = 100;
 
     private readonly AppServices _services;
     private readonly List<BullionRowViewModel> _allRows = new();
@@ -98,6 +100,7 @@ public sealed class BullionViewModel : BindableBase
     private int _itemsPerPage = DefaultItemsPerPage;
     private int _currentPage = 1;
     private int _totalPages;
+    private CancellationTokenSource? _loadCts;
 
     public BullionViewModel(AppServices services)
     {
@@ -345,13 +348,14 @@ public sealed class BullionViewModel : BindableBase
     public async Task ApplyRangeAsync(string? rangeKey)
     {
         var normalized = NormalizeRangeKey(rangeKey);
-        if (string.Equals(SelectedRangeKey, normalized, StringComparison.Ordinal) && HasData)
+        if (string.Equals(SelectedRangeKey, normalized, StringComparison.Ordinal) && (HasData || IsBusy))
         {
             return;
         }
 
         SelectedRangeKey = normalized;
-        await RefreshAsync();
+        // Supersedes any load still in flight for the previous range.
+        await LoadAsync();
     }
 
     /// <summary>
@@ -374,12 +378,24 @@ public sealed class BullionViewModel : BindableBase
             return;
         }
 
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// Loads the selected range. A newer call cancels an older one, and only the
+    /// newest call may update state, so a range picked mid-load is never lost.
+    /// </summary>
+    private async Task LoadAsync()
+    {
+        _loadCts?.Cancel();
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        _loadCts = cts;
+
         IsBusy = true;
         ErrorMessage = string.Empty;
 
         try
         {
-            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(20));
             var includeAllHistory = string.Equals(SelectedRangeKey, "ALL", StringComparison.Ordinal);
             var fromDate = includeAllHistory ? (DateOnly?)null : ResolveFromDateForRange(SelectedRangeKey);
 
@@ -387,6 +403,11 @@ public sealed class BullionViewModel : BindableBase
                 fromDate: fromDate,
                 includeAllHistory: includeAllHistory,
                 cancellationToken: cts.Token);
+
+            if (!ReferenceEquals(_loadCts, cts))
+            {
+                return; // superseded by a newer range selection
+            }
 
             if (response is null || response.Entries.Count == 0)
             {
@@ -503,18 +524,32 @@ public sealed class BullionViewModel : BindableBase
             HasData = true;
             DataVersion++;
         }
+        catch (OperationCanceledException) when (!ReferenceEquals(_loadCts, cts))
+        {
+            // Superseded by a newer range selection.
+        }
         catch (OperationCanceledException)
         {
             ErrorMessage = "Bullion data request timed out. Please try again.";
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Failed to load bullion data: {ex.Message}";
+            if (ReferenceEquals(_loadCts, cts))
+            {
+                ErrorMessage = $"Failed to load bullion data: {ex.Message}";
+            }
+
             Debug.WriteLine($"BullionViewModel fetch error: {ex}");
         }
         finally
         {
-            IsBusy = false;
+            if (ReferenceEquals(_loadCts, cts))
+            {
+                _loadCts = null;
+                IsBusy = false;
+            }
+
+            cts.Dispose();
         }
     }
 
@@ -578,7 +613,7 @@ public sealed class BullionViewModel : BindableBase
 
     private static DateOnly ResolveFromDateForRange(string rangeKey)
     {
-        var today = DateOnly.FromDateTime(DateTime.Today);
+        var today = new OpenPatro.Services.NepalTimeService().GetNepalToday();
         return rangeKey switch
         {
             "90D" => today.AddDays(-90),

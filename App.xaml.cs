@@ -1,9 +1,9 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using System.Globalization;
 using H.NotifyIcon;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -17,8 +17,7 @@ namespace OpenPatro
 {
     public partial class App : Application
     {
-        private static readonly string DiagLogPath =
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "openpatro-diag.log");
+        private const string StartupConfiguredSettingKey = "StartupConfigured";
 
         private MainWindow? _mainWindow;
         private TrayPopupWindow? _trayPopupWindow;
@@ -32,55 +31,53 @@ namespace OpenPatro
         private DispatcherKeepaliveWindow? _keepaliveWindow;
         private volatile bool _trayToggleRunning;
         private DateTimeOffset _trayToggleStartedAt;
-        private DateTimeOffset _lastTrayDateNotificationAt;
         private bool _calendarResetInProgress;
         private Microsoft.UI.Dispatching.DispatcherQueueTimer? _trayRefreshTimer;
+        private string? _trayIconKey;
 
-        private static readonly TimeSpan TrayDateNotificationCooldown = TimeSpan.FromSeconds(2);
+        // Set when another launch asks to show the window before startup has finished
+        // creating the view models; honoured once they exist.
+        private bool _showWindowWhenReady;
 
         public AppServices Services { get; private set; } = null!;
         public MainViewModel MainViewModel { get; private set; } = null!;
         public DateChangeWatcher? DateChangeWatcher => _dateChangeSubscription;
+
+        private bool IsReady => MainViewModel is not null;
 
         public App()
         {
             Environment.SetEnvironmentVariable("MICROSOFT_WINDOWSAPPRUNTIME_BASE_DIRECTORY", AppContext.BaseDirectory);
             InitializeComponent();
             UnhandledException += OnUnhandledException;
+            AppDomain.CurrentDomain.UnhandledException += (_, e) => Log($"AppDomain.UnhandledException (terminating={e.IsTerminating}): {e.ExceptionObject}");
+            TaskScheduler.UnobservedTaskException += (_, e) =>
+            {
+                Log($"UnobservedTaskException: {e.Exception}");
+                e.SetObserved();
+            };
         }
 
         private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
         {
+            // A tray app should keep running; the failure is recorded instead of crashing.
             Log($"UnhandledException: {e.Exception}");
             e.Handled = true;
         }
 
         protected override async void OnLaunched(LaunchActivatedEventArgs args)
         {
-            Log("OnLaunched: start");
+            Trace("OnLaunched: start");
             _uiDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
             try
             {
-                Log("Creating AppServices...");
                 Services = await AppServices.CreateAsync();
-                Log($"AppServices OK. CalendarDB={Services.Paths.CalendarDatabasePath}");
+                Trace($"AppServices OK. CalendarDB={Services.Paths.CalendarDatabasePath}");
 
-                try
-                {
-                    if (!Services.Startup.IsEnabled())
-                    {
-                        Services.Startup.SetEnabled(true);
-                        Log("Startup: enabled automatically");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log($"Startup auto-enable FAILED: {ex}");
-                }
+                await EnableStartupOnFirstRunAsync();
 
                 MainViewModel = new MainViewModel(Services);
-                Log("MainViewModel created");
 
                 if (await TryRunBundledSeedModeAsync())
                 {
@@ -88,58 +85,97 @@ namespace OpenPatro
                     return;
                 }
 
-                var isStartupLaunch = IsStartupLaunch();
-                if (isStartupLaunch)
+                if (IsStartupLaunch() && !_showWindowWhenReady)
                 {
-                    Log("Startup launch detected: initializing tray only");
+                    Trace("Startup launch detected: initializing tray only");
                     _ = InitializeAfterWindowShownAsync();
                     return;
                 }
 
-                Log("Showing MainWindow...");
                 ShowMainWindow(resetCalendarToToday: false);
-                Log("MainWindow shown");
 
                 // Load data and tray icon in the background so the window appears instantly.
                 _ = InitializeAfterWindowShownAsync();
             }
             catch (Exception ex)
             {
+                // Without services there is no window and no tray icon. Staying alive would
+                // leave an invisible process that swallows every later launch, so tell the
+                // user and exit (which also releases the single-instance key).
                 Log($"OnLaunched FAILED: {ex}");
+                ShowFatalStartupError(ex);
+                Environment.Exit(1);
             }
         }
+
+        /// <summary>
+        /// Turns "Start with Windows" on automatically the first time the app runs.
+        /// After that the user's choice (Settings or tray menu) is never overridden.
+        /// </summary>
+        private async Task EnableStartupOnFirstRunAsync()
+        {
+            try
+            {
+                if (await Services.UserRepository.GetSettingAsync(StartupConfiguredSettingKey) is not null)
+                {
+                    return;
+                }
+
+                await Services.Startup.SetEnabledAsync(true);
+                await Services.UserRepository.SetSettingAsync(StartupConfiguredSettingKey, "1");
+                Trace("Startup: enabled on first run");
+            }
+            catch (Exception ex)
+            {
+                Log($"Startup first-run enable FAILED: {ex}");
+            }
+        }
+
+        private static void ShowFatalStartupError(Exception ex)
+        {
+            const uint mbOk = 0x0, mbIconError = 0x10, mbSetForeground = 0x10000;
+            var message =
+                "OpenPatro could not start.\n\n" +
+                $"{ex.Message}\n\n" +
+                $"Details were written to:\n{DiagnosticLog.LogPath}";
+            _ = MessageBoxW(IntPtr.Zero, message, "OpenPatro", mbOk | mbIconError | mbSetForeground);
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
 
         public void ShowMainWindow(bool resetCalendarToToday = true)
         {
             if (_uiDispatcherQueue?.HasThreadAccess == true)
             {
-                ShowMainWindowCore();
-                if (resetCalendarToToday)
-                {
-                    _ = ResetCalendarToTodayAsync();
-                }
+                ShowMainWindowOrDefer(resetCalendarToToday);
                 return;
             }
 
-            _uiDispatcherQueue?.TryEnqueue(() =>
+            _uiDispatcherQueue?.TryEnqueue(() => ShowMainWindowOrDefer(resetCalendarToToday));
+        }
+
+        private void ShowMainWindowOrDefer(bool resetCalendarToToday)
+        {
+            if (!IsReady)
             {
-                ShowMainWindowCore();
-                if (resetCalendarToToday)
-                {
-                    _ = ResetCalendarToTodayAsync();
-                }
-            });
+                // A second launch arrived while OnLaunched is still creating services.
+                _showWindowWhenReady = true;
+                return;
+            }
+
+            ShowMainWindowCore();
+            if (resetCalendarToToday)
+            {
+                _ = ResetCalendarToTodayAsync();
+            }
         }
 
         public async Task ShowMainWindowAsync(bool resetCalendarToToday = true)
         {
             if (_uiDispatcherQueue?.HasThreadAccess == true)
             {
-                ShowMainWindowCore();
-                if (resetCalendarToToday)
-                {
-                    _ = ResetCalendarToTodayAsync();
-                }
+                ShowMainWindowOrDefer(resetCalendarToToday);
                 return;
             }
 
@@ -154,11 +190,7 @@ namespace OpenPatro
                 {
                     try
                     {
-                        ShowMainWindowCore();
-                        if (resetCalendarToToday)
-                        {
-                            _ = ResetCalendarToTodayAsync();
-                        }
+                        ShowMainWindowOrDefer(resetCalendarToToday);
                         tcs.TrySetResult(null);
                     }
                     catch (Exception ex)
@@ -221,9 +253,9 @@ namespace OpenPatro
         {
             try
             {
-                Log("Loading calendar data...");
+                Trace("Loading calendar data...");
                 await MainViewModel.InitializeAsync();
-                Log("Calendar data loaded");
+                Trace("Calendar data loaded");
             }
             catch (Exception ex)
             {
@@ -236,7 +268,7 @@ namespace OpenPatro
             {
                 _trayCalendarViewModel = new CalendarViewModel(Services);
                 await _trayCalendarViewModel.InitializeAsync();
-                Log("Tray CalendarViewModel initialized");
+                Trace("Tray CalendarViewModel initialized");
             }
             catch (Exception ex)
             {
@@ -250,7 +282,7 @@ namespace OpenPatro
             {
                 _keepaliveWindow = new DispatcherKeepaliveWindow();
                 _keepaliveWindow.Create();
-                Log("Keepalive window created");
+                Trace("Keepalive window created");
             }
             catch (Exception ex)
             {
@@ -260,9 +292,9 @@ namespace OpenPatro
             // Then set up the tray icon (this can be slow with H.NotifyIcon).
             try
             {
-                Log("Setting up tray icon...");
+                Trace("Setting up tray icon...");
                 InitializeTrayInfrastructure();
-                Log("Tray icon OK");
+                Trace("Tray icon OK");
             }
             catch (Exception ex)
             {
@@ -376,35 +408,64 @@ namespace OpenPatro
                 return;
             }
 
+            Models.CalendarDayRecord? today;
             try
             {
-                var today = await Services.CalendarRepository.GetTodayAsync();
-                if (today is null)
+                today = await Services.CalendarRepository.GetTodayAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"RefreshTray: reading today FAILED: {ex}");
+                return;
+            }
+
+            if (today is not null)
+            {
+                // Each part is updated independently: H.NotifyIcon can fail a tooltip
+                // update (seen after Explorer restarts), which must not also skip the icon.
+                try
                 {
-                    return;
+                    var iconKey = $"{today.BsDayText}|{today.IsHoliday}";
+                    if (!string.Equals(iconKey, _trayIconKey, StringComparison.Ordinal) || _trayIcon.Icon is null)
+                    {
+                        var newIcon = TrayIconGlyphFactory.CreateIcon(today.BsDayText, today.IsHoliday);
+                        var oldIcon = _trayIcon.Icon;
+                        _trayIcon.Icon = newIcon;
+                        // The factory hands us an owned handle — release the previous one.
+                        oldIcon?.Dispose();
+                        _trayIconKey = iconKey;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"RefreshTray: icon update FAILED: {ex}");
                 }
 
-                _trayIcon.ToolTipText = today.BsFullDate;
-                var newIcon = TrayIconGlyphFactory.CreateIcon(today.BsDayText, today.IsHoliday);
-                var oldIcon = _trayIcon.Icon;
-                _trayIcon.Icon = newIcon;
-                // The factory hands us an owned handle each refresh — release the
-                // previous one or icons (native + managed) leak ~once a minute.
-                oldIcon?.Dispose();
+                try
+                {
+                    _trayIcon.ToolTipText = today.BsFullDate;
+                }
+                catch (Exception ex)
+                {
+                    Log($"RefreshTray: tooltip update FAILED: {ex.Message}");
+                }
 
                 if (_todayMenuItem is not null)
                 {
                     _todayMenuItem.Text = today.BsFullDate;
                 }
-
-                if (_startupMenuItem is not null)
-                {
-                    _startupMenuItem.IsChecked = Services.Startup.IsEnabled();
-                }
             }
-            catch (Exception ex)
+
+            if (_startupMenuItem is not null)
             {
-                Log($"RefreshTray FAILED: {ex}");
+                try
+                {
+                    _startupMenuItem.IsChecked = await Services.Startup.IsEnabledAsync();
+                }
+                catch (Exception ex)
+                {
+                    Log($"RefreshTray: startup state FAILED: {ex.Message}");
+                }
             }
         }
 
@@ -464,6 +525,7 @@ namespace OpenPatro
 
         private static bool IsStartupLaunch()
         {
+            // Unpackaged: the HKCU Run value passes --startup.
             foreach (var arg in Environment.GetCommandLineArgs())
             {
                 if (string.Equals(arg, "--startup", StringComparison.OrdinalIgnoreCase))
@@ -472,7 +534,16 @@ namespace OpenPatro
                 }
             }
 
-            return false;
+            // Packaged (MSIX): Windows activates the app through the startup task instead.
+            try
+            {
+                return Microsoft.Windows.AppLifecycle.AppInstance.GetCurrent().GetActivatedEventArgs().Kind
+                    == Microsoft.Windows.AppLifecycle.ExtendedActivationKind.StartupTask;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void InitializeTrayInfrastructure()
@@ -519,12 +590,10 @@ namespace OpenPatro
             contextMenu.Items.Add(new MenuFlyoutSeparator());
             contextMenu.Items.Add(exitItem);
 
-            // Left-click toggles the mini calendar popup. (Previous behavior was a
-            // "today" balloon notification via ShowTodayFromTrayAsync — kept below
-            // in case we want to switch back.)
+            // Left-click toggles the mini calendar popup.
             var togglePopupCommand = new RelayCommand(() =>
             {
-                Log("TrayPopup: left-click received");
+                Trace("TrayPopup: left-click received");
                 _ = SafeToggleTrayPopupAsync();
             });
 
@@ -560,102 +629,6 @@ namespace OpenPatro
             catch (Exception ex)
             {
                 Log($"TrayPopup bootstrap FAILED: {ex}");
-            }
-        }
-
-        private async Task ShowTodayFromTrayAsync()
-        {
-            var dispatcher = _uiDispatcherQueue;
-            if (dispatcher is not null && !dispatcher.HasThreadAccess)
-            {
-                var tcs = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
-                if (!dispatcher.TryEnqueue(async () =>
-                    {
-                        try
-                        {
-                            await ShowTodayFromTrayAsync();
-                            tcs.TrySetResult(null);
-                        }
-                        catch (Exception ex)
-                        {
-                            tcs.TrySetException(ex);
-                        }
-                    }))
-                {
-                    Log("TrayDate: failed to enqueue notification on UI dispatcher");
-                    return;
-                }
-
-                await tcs.Task;
-                return;
-            }
-
-            try
-            {
-                var now = DateTimeOffset.UtcNow;
-
-                // Ensure tray icon + tooltip reflect the current date even if a
-                // midnight refresh was missed (e.g. system sleep/resume).
-                await RefreshTrayPresentationAsync();
-
-                if (now - _lastTrayDateNotificationAt < TrayDateNotificationCooldown)
-                {
-                    return;
-                }
-
-                HideTrayPopupWindow();
-
-                var today = await Services.CalendarRepository.GetTodayAsync();
-                var nepaliDate = today?.BsFullDate;
-                var englishDate = today?.AdDateText;
-                var message =
-                    $"Nepali (BS): {nepaliDate ?? "Unavailable"}\r\n" +
-                    $"English (AD): {englishDate ?? "Unavailable"}";
-
-                TryShowTrayNotification("OpenPatro - Today", message);
-                _lastTrayDateNotificationAt = now;
-            }
-            catch (Exception ex)
-            {
-                Log($"TrayDate FAILED: {ex}");
-            }
-        }
-
-        private void TryShowTrayNotification(string title, string message)
-        {
-            if (_trayIcon is null)
-            {
-                return;
-            }
-
-            try
-            {
-                var method = _trayIcon.GetType().GetMethod("ShowNotification", BindingFlags.Instance | BindingFlags.Public);
-                if (method is null)
-                {
-                    return;
-                }
-
-                var parameters = method.GetParameters();
-                if (parameters.Length < 2)
-                {
-                    return;
-                }
-
-                var args = new object?[parameters.Length];
-                args[0] = title;
-                args[1] = message;
-
-                for (var index = 2; index < parameters.Length; index++)
-                {
-                    args[index] = parameters[index].HasDefaultValue ? parameters[index].DefaultValue : null;
-                }
-
-                _ = method.Invoke(_trayIcon, args);
-            }
-            catch (Exception ex)
-            {
-                Log($"TrayDate notification FAILED: {ex}");
             }
         }
 
@@ -698,11 +671,11 @@ namespace OpenPatro
             {
                 if (DateTimeOffset.UtcNow - _trayToggleStartedAt < TimeSpan.FromSeconds(5))
                 {
-                    Log("TrayPopup: toggle already running, ignoring click");
+                    Trace("TrayPopup: toggle already running, ignoring click");
                     return;
                 }
 
-                Log("TrayPopup: previous toggle timed out, forcing reset");
+                Trace("TrayPopup: previous toggle timed out, forcing reset");
             }
 
             _trayToggleRunning = true;
@@ -723,7 +696,7 @@ namespace OpenPatro
 
         private async Task ToggleTrayPopupWindowCoreAsync()
         {
-            Log("TrayPopup: toggle requested");
+            Trace("TrayPopup: toggle requested");
 
             // If the existing popup window's HWND has been destroyed, recreate it.
             if (_trayPopupWindow is not null)
@@ -731,7 +704,7 @@ namespace OpenPatro
                 var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_trayPopupWindow);
                 if (hwnd == IntPtr.Zero || !IsWindow(hwnd))
                 {
-                    Log("TrayPopup: existing HWND is invalid, recreating");
+                    Trace("TrayPopup: existing HWND is invalid, recreating");
                     _trayPopupWindow.Closed -= TrayPopupWindow_Closed;
                     _trayPopupWindow = null;
                 }
@@ -740,7 +713,7 @@ namespace OpenPatro
             var popupWindow = GetOrCreateTrayPopupWindow();
             if (popupWindow.IsPopupVisible)
             {
-                Log("TrayPopup: hiding");
+                Trace("TrayPopup: hiding");
                 popupWindow.HidePopup();
                 return;
             }
@@ -750,20 +723,20 @@ namespace OpenPatro
                 // The dismiss hook already hid the popup for this very click
                 // (the tray icon is outside the popup). Showing now would just
                 // re-open what the user closed — treat the toggle as handled.
-                Log("TrayPopup: show suppressed, same click just dismissed it");
+                Trace("TrayPopup: show suppressed, same click just dismissed it");
                 return;
             }
 
             try
             {
-                Log("TrayPopup: showing");
+                Trace("TrayPopup: showing");
                 // Show FIRST, synchronously inside the click dispatch, so the window
                 // can take foreground while the tray-click input context is still
                 // valid. Awaiting data load before showing expired that context, so
                 // Windows refused foreground and the popup instantly auto-hid.
                 // Data loads right after and fills in live via bindings.
                 popupWindow.ShowPopup();
-                Log("TrayPopup: shown OK");
+                Trace("TrayPopup: shown OK");
             }
             catch (Exception ex)
             {
@@ -777,7 +750,7 @@ namespace OpenPatro
 
                 popupWindow = GetOrCreateTrayPopupWindow();
                 popupWindow.ShowPopup();
-                Log("TrayPopup: shown OK after recreate");
+                Trace("TrayPopup: shown OK after recreate");
             }
 
             if (_trayCalendarViewModel is not null)
@@ -894,7 +867,7 @@ namespace OpenPatro
                 if (_keepaliveWindow is not null)
                 {
                     _mainWindow.Hide();
-                    Log("MainWindow: hidden to tray");
+                    Trace("MainWindow: hidden to tray");
                     return;
                 }
 
@@ -906,7 +879,7 @@ namespace OpenPatro
                     SetWindowLongPtrApp(hwnd, GwlExStyleApp, new IntPtr(exStyle | WsExToolWindowApp));
                     SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SwpNoSize | SwpNoMove | SwpNoActivate | SwpNoZOrder | SwpFrameChanged);
                     ShowWindow(hwnd, SwMinimize);
-                    Log("MainWindow: minimized to tray (keepalive not ready)");
+                    Trace("MainWindow: minimized to tray (keepalive not ready)");
                 }
             }
         }
@@ -924,14 +897,22 @@ namespace OpenPatro
             }
         }
 
-        private void StartupMenuItem_Click(object sender, RoutedEventArgs e)
+        private async void StartupMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not ToggleMenuFlyoutItem menuItem)
             {
                 return;
             }
 
-            Services.Startup.SetEnabled(menuItem.IsChecked);
+            try
+            {
+                menuItem.IsChecked = await Services.Startup.SetEnabledAsync(menuItem.IsChecked);
+                await MainViewModel.Settings.RefreshStartupStateAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"StartupMenuItem_Click FAILED: {ex}");
+            }
         }
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
@@ -939,17 +920,11 @@ namespace OpenPatro
             ExitApplication();
         }
 
-        internal static void Log(string message)
-        {
-            try
-            {
-                var entry = $"[{DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture)}] {message}{Environment.NewLine}";
-                File.AppendAllText(DiagLogPath, entry);
-            }
-            catch
-            {
-                // Cannot log – silently ignore.
-            }
-        }
+        /// <summary>Errors and unexpected failures; written in every build.</summary>
+        internal static void Log(string message) => DiagnosticLog.Error(message);
+
+        /// <summary>Verbose tracing; compiled out of Release builds.</summary>
+        [Conditional("DEBUG")]
+        internal static void Trace(string message) => DiagnosticLog.Trace(message);
     }
 }

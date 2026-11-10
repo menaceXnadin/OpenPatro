@@ -33,6 +33,7 @@ public sealed class CalendarViewModel : BindableBase
     private int _displayMonth;
     private int _selectedNavigationYear;
     private MonthNavigationOption? _selectedNavigationMonth;
+    private int _loadSequence;
 
     private static readonly string[] NepaliMonthNames =
     [
@@ -228,6 +229,12 @@ public sealed class CalendarViewModel : BindableBase
 
     public async Task LoadMonthAsync(int year, int month)
     {
+        // Loads can overlap (picker navigation, midnight refresh, "open date" from the
+        // tray). Each await is a point where a newer load may have started; a stale
+        // load must not overwrite the newer month's titles or cells.
+        var sequence = ++_loadSequence;
+        bool IsStale() => sequence != _loadSequence;
+
         IsBusy = true;
         try
         {
@@ -259,7 +266,7 @@ public sealed class CalendarViewModel : BindableBase
             }
 
             var monthRecord = await _services.CalendarRepository.GetMonthRecordAsync(year, month);
-            if (monthRecord is null)
+            if (monthRecord is null || IsStale())
             {
                 return;
             }
@@ -272,6 +279,11 @@ public sealed class CalendarViewModel : BindableBase
             var previousMonthDays = await _services.CalendarRepository.GetMonthDaysAsync(previous.year, previous.month);
             var nextMonthDays = await _services.CalendarRepository.GetMonthDaysAsync(next.year, next.month);
             var today = await _services.CalendarRepository.GetTodayAsync();
+            if (IsStale())
+            {
+                return;
+            }
+
             SetTodayRecord(today);
 
             // Build the 42 cells off-screen, then swap them in with a single UI
@@ -302,7 +314,10 @@ public sealed class CalendarViewModel : BindableBase
         }
         finally
         {
-            IsBusy = false;
+            if (!IsStale())
+            {
+                IsBusy = false;
+            }
         }
     }
 
@@ -350,8 +365,15 @@ public sealed class CalendarViewModel : BindableBase
 
         if (!cell.IsCurrentMonth)
         {
-            await LoadMonthAsync(cell.Record.BsYear, cell.Record.BsMonth);
-            cell = Days.First(day => day.Record.BsYear == cell.Record.BsYear && day.Record.BsMonth == cell.Record.BsMonth && day.Record.BsDay == cell.Record.BsDay);
+            var target = cell.Record;
+            await LoadMonthAsync(target.BsYear, target.BsMonth);
+            var reloaded = Days.FirstOrDefault(day => day.Record.BsYear == target.BsYear && day.Record.BsMonth == target.BsMonth && day.Record.BsDay == target.BsDay);
+            if (reloaded is null)
+            {
+                return;
+            }
+
+            cell = reloaded;
         }
 
         if (SelectedDay is not null)

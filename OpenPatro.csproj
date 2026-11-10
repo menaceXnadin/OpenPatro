@@ -38,6 +38,15 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
+  <!-- The test project lives under tests/; keep its sources out of the app build. -->
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <None Remove="tests\**" />
+    <Content Remove="tests\**" />
+    <Page Remove="tests\**" />
+    <InternalsVisibleTo Include="OpenPatro.Tests" />
+  </ItemGroup>
+
   <!--
     Defining the "Msix" ProjectCapability here allows the Single-project MSIX Packaging
     Tools extension to be activated for this project even if the Windows App SDK Nuget
@@ -51,7 +60,13 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
     <PackageReference Include="H.NotifyIcon.WinUI" Version="2.3.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.13" />
+    <!-- Pin the native SQLite bundle above 2.1.11 (GHSA-2m69-gcr7-jv3q, High: affects <= 2.1.11). -->
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.14" />
     <PackageReference Include="System.Formats.Nrbf" Version="9.0.1" />
+    <!-- Managed projections of unused Windows App SDK components (see ExcludeUnusedWindowsAppSdkPayload). -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.AI" Version="1.8.47" ExcludeAssets="compile;runtime" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.ML" Version="1.8.2124" ExcludeAssets="compile;runtime" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Widgets" Version="1.8.251231004" ExcludeAssets="compile;runtime" />
   </ItemGroup>
 
   <ItemGroup>
@@ -84,11 +99,34 @@
   <PropertyGroup>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
     <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <!-- Never trim. WinUI hands .NET collections (ObservableCollection etc.) to XAML via
+         CsWinRT, which needs interop code the trimmer removes: every ItemsSource binding then
+         throws NullReferenceException in WinRT.TypeExtensions.GetAbiToProjectionVftblPtr
+         (seen in 1.0.0-era logs and again in a 1.0.2 test build). Trimming would require the
+         CsWinRT AOT source generators and [GeneratedBindableCustomProperty] on every bound type. -->
+    <PublishTrimmed>False</PublishTrimmed>
+    <!-- NU1603: the AI/ML component packages (referenced only to exclude them) ask for an
+         older Foundation build than the one the metapackage already resolves. Harmless. -->
+    <NoWarn>$(NoWarn);NU1603</NoWarn>
     <WindowsPackageType>MSIX</WindowsPackageType>
     <ImplicitUsings>disable</ImplicitUsings>
   </PropertyGroup>
+
+  <!--
+    Self-contained Windows App SDK deployment copies the whole runtime, including AI/ML
+    (ONNX Runtime, DirectML) and Widgets, ~42 MB that OpenPatro never loads. The SDK's own
+    MicrosoftWindowsAppSDKFilesExcluded hook removes them from the copy list. If the app
+    ever starts using Windows AI/Widgets APIs, delete this target and the three references below.
+  -->
+  <Target Name="ExcludeUnusedWindowsAppSdkPayload"
+          BeforeTargets="AddMicrosoftWindowsAppSDKPayloadFilesFromMsix;AddMicrosoftWindowsAppSDKPayloadFilesFromComponents">
+    <ItemGroup Condition="'$(MicrosoftWindowsAppSDKMsixContent)' != ''">
+      <MicrosoftWindowsAppSDKFilesExcluded Include="$(MicrosoftWindowsAppSDKMsixContent)\onnxruntime*.dll" />
+      <MicrosoftWindowsAppSDKFilesExcluded Include="$(MicrosoftWindowsAppSDKMsixContent)\DirectML.dll" />
+      <MicrosoftWindowsAppSDKFilesExcluded Include="$(MicrosoftWindowsAppSDKMsixContent)\Microsoft.Windows.AI.*" />
+      <MicrosoftWindowsAppSDKFilesExcluded Include="$(MicrosoftWindowsAppSDKMsixContent)\Microsoft.Windows.Widgets.*" />
+    </ItemGroup>
+  </Target>
 
   <!-- VS deploy expects AppxManifest.xml at the output root for packaged launches. -->
   <Target Name="EnsureRootAppxManifestForDeploy" AfterTargets="Build" Condition="'$(EnableMsixTooling)'=='true'">

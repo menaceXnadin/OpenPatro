@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
@@ -49,8 +50,75 @@ public sealed class DatabaseBootstrapper
             using var file = File.Create(_paths.UserDatabasePath);
         }
 
-        await EnsureCalendarSchemaAsync();
-        await EnsureUserSchemaAsync();
+        await EnsureSchemaWithRecoveryAsync(_paths.CalendarDatabasePath, EnsureCalendarSchemaAsync, restoreFromBundle: true);
+        await EnsureSchemaWithRecoveryAsync(_paths.UserDatabasePath, EnsureUserSchemaAsync, restoreFromBundle: false);
+    }
+
+    /// <summary>
+    /// Runs a schema step; if the file is not a usable SQLite database (corrupt or
+    /// replaced), moves it aside as <c>*.corrupt-&lt;timestamp&gt;</c>, recreates it
+    /// (from the bundled seed for the calendar) and retries once. Without this a
+    /// damaged user.db made startup fail on every launch.
+    /// </summary>
+    private async Task EnsureSchemaWithRecoveryAsync(string databasePath, Func<Task> ensureSchema, bool restoreFromBundle)
+    {
+        try
+        {
+            await ensureSchema();
+            return;
+        }
+        catch (SqliteException ex) when (IsUnusableDatabase(ex))
+        {
+            OpenPatro.Infrastructure.DiagnosticLog.Error($"Database '{databasePath}' is unusable ({ex.Message}); recreating it.");
+        }
+
+        SqliteConnection.ClearAllPools();
+        var suffix = ".corrupt-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+        TryMoveFile(databasePath, databasePath + suffix);
+        TryDeleteFile(databasePath + "-wal");
+        TryDeleteFile(databasePath + "-shm");
+
+        var restored = false;
+        if (restoreFromBundle && File.Exists(_paths.BundledCalendarDatabasePath))
+        {
+            try
+            {
+                File.Copy(_paths.BundledCalendarDatabasePath, databasePath, overwrite: true);
+                restored = true;
+            }
+            catch
+            {
+                // Fall back to an empty database below.
+            }
+        }
+
+        if (!restored)
+        {
+            using var file = File.Create(databasePath);
+        }
+
+        await ensureSchema();
+    }
+
+    private static bool IsUnusableDatabase(SqliteException ex)
+    {
+        // SQLITE_CORRUPT (11) and SQLITE_NOTADB (26).
+        return ex.SqliteErrorCode is 11 or 26;
+    }
+
+    private static void TryMoveFile(string from, string to)
+    {
+        try
+        {
+            if (File.Exists(from))
+            {
+                File.Move(from, to, overwrite: true);
+            }
+        }
+        catch
+        {
+            TryDeleteFile(from);
+        }
     }
 
     private static void TryDeleteFile(string path)
