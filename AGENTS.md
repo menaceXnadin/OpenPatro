@@ -1,6 +1,6 @@
 # AGENTS.md — OpenPatro
 
-Single-project WinUI 3 / Windows App SDK desktop app (.NET 8). Tests: `dotnet test tests/OpenPatro.Tests/OpenPatro.Tests.csproj` (xUnit, x64; references the app project, uses `InternalsVisibleTo`). CI: `.github/workflows/ci.yml` (build + test on windows-latest). No lint. Windows-only: build/run on Windows 10/11; plain `dotnet build` defaults to **x64** (csproj forces `Platform=x64` when unspecified).
+Single-project WinUI 3 / Windows App SDK desktop app (.NET 8). Tests: `dotnet test tests/OpenPatro.Tests/OpenPatro.Tests.csproj` (xUnit, x64; references the app project, uses `InternalsVisibleTo`). No CI: builds and releases are done locally (publish → Inno Setup → upload to GitHub Releases); run the tests before releasing. No lint. Windows-only: build/run on Windows 10/11; plain `dotnet build` defaults to **x64** (csproj forces `Platform=x64` when unspecified).
 
 ## Build / run / publish
 

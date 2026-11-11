@@ -30,3 +30,7 @@ log-tail.txt
 
 # Local sample input files
 *_sample*.txt
+
+# SQLite WAL side files
+*.db-shm
+*.db-wal
